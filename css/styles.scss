@@ -1,12 +1,12 @@
 // 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
 @import "../node_modules/bootstrap/scss/functions";
-
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Source+Sans+3:ital,wght@0,200..900;1,200..900&display=swap');
 // 2. Include any default variable overrides here
 $link-decoration: none;
 $light: #EDF2F3;
 $gray: #5E626F;
-$primary: #202437;
-$dark: #449FEE;
+$dark: #202437;
+$primary: #449FEE;
 $secondary: #525FDD;
 $info: #E93C79;
 // 3. Include remainder of required Bootstrap stylesheets
@@ -24,9 +24,12 @@ $theme-colors: map-merge($theme-colors, $custom-colors);
 
 // 5. Du kan lave styling her...
 body{
-	background: black;
+	background: #EDF2F3;
 	font-family: "Source Sans 3", sans-serif;
-	width: 768px;
+}
+
+.montserrat{
+	font-family: "Montserrat", sans-serif;
 }
 
 .flex-center{
@@ -46,7 +49,10 @@ body{
 	align-items: center;
 }
 
+.fs-stats{
+	font-size: 40px;
+}
 
-h1 h2 h3 h4 h5 h6{
-	font-family: "Montserrat", sans-serif;
+.fs-stats2{
+	font-size: 12px;
 }
