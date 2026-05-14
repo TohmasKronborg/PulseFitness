@@ -41,67 +41,30 @@ if (!empty($workouts)) {
 <html lang="da">
 <head>
     <meta charset="utf-8">
-    
+
     <title>Velkommen <?php echo $name?></title>
-    
+
     <meta name="robots" content="All">
     <meta name="author" content="Udgiver">
     <meta name="copyright" content="Information om copyright">
-    
+
     <link rel="stylesheet" href="css/styles.css" type="text/css">
     <link rel="icon" href="images/LogoBlack.png">
-    
+
     <meta name="viewport" content="width=device-width, initial-scale=1">
 </head>
 
-<body class="mx-auto position-relative" style="max-width: 768px; height: 100vh; ">
+<body class="overflow-x-hidden mx-auto position-relative flex-column" style="max-width: 768px; height: 100vh; ">
 
 <!-- Dims Nav -->
-<nav class="position-relative overflow-x-hidden">
-    <img src="images/dims.svg" alt="dims" class="" style="margin-top: -50px; margin-left: -175px;">
+<nav class="position-relative flex-shrink-1 overflow-x-hidden">
+    <img src="images/dimsSecondary.svg" alt="dims" style="margin-top: -50px; margin-left: -175px;">
     <a href="index.php"><img src="images/LogoWhite.png" alt="WhiteLogo" class="img-fluid position-absolute top-0 start-50 translate-middle mt-5" style="max-width: 100px;"></a>
 </nav>
 
-<!-- Stats -->
-<main class="container-fluid mt-3 mb-4">
-    <h2 class="montserrat mb-3 fs-3 text-secondary">Velkommen <br> <b class="fs-1 text-dark"><?php echo $name ?></b></h2>
-    <div class="row gap-3 justify-content-center">
-        <div class="col-5 bg-white rounded-4 p-3 pt-4 flex-column"><span class="text-info montserrat fw-bold fs-stats"><?php echo $streak ?></span> <span class="fs-stats2">Rutine streak</span></div>
-        <div class="col-5 bg-white rounded-4 p-3 pt-4 flex-column"><span class="text-primary montserrat fw-bold fs-stats"><?php echo $exCompleted ?></span> <span class="fs-stats2">Gennemførte Rutiner</span></div>
-        <div class="col-5 bg-white rounded-4 p-3 pt-4 flex-column"><span class="text-secondary montserrat fw-bold fs-stats"><?php echo $exTotal ?></span> <span class="fs-stats2">Øvelser Lavet</span></div>
-        <div class="col-5 bg-white rounded-4 p-3 pt-4 flex-column"><span class="text-secondary montserrat fw-bold fs-stats"><?php echo $timetotal ?></span> <span class="fs-stats2">Tid Brugt</span></div>
-    </div>
-</main>
-
-
-<!-- Nuværende rutine -->
-<section class="container-fluid">
-    <div>
-        <h1 class="montserrat fw-bold">Dagens Rutine</h1>
-        <p class="text-center mt-5">
-            <?php echo $noWorkout ?>
-        </p>
-    </div>
-
-    <?php
-
-    $nextWorkouts = count($workouts);
-
-    for ($i = 1; $i < $nextWorkouts; $i++) {
-        echo $workouts[$i]->name;
-        echo "<br>";
-    }
-    ?>
-</section>
-
-
-<!-- Random Logout -->
-<div class="text-center mt-5 fw-bolder mb-5">
-    <a href="logout.php">log ud</a>
-</div>
 
 <!-- Bottom Nav -->
-<footer class="mt-auto rounded-top-circle bg-white position-sticky bottom-0" style="min-height: 85px;">
+<footer class="mt-auto rounded-top-circle bg-white flex-shrink-0" style="min-height: 85px;">
     <div class="d-flex justify-content-around" style="margin-top: -25px;">
         <!-- Button 1 -->
         <div class="flex-column-center gap-1" >
