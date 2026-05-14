@@ -25,6 +25,7 @@ $theme-colors: map-merge($theme-colors, $custom-colors);
 // 5. Du kan lave styling her...
 body{
 	background: #EDF2F3;
+	color: #202437;
 	font-family: "Source Sans 3", sans-serif;
 }
 
@@ -55,4 +56,10 @@ body{
 
 .fs-stats2{
 	font-size: 12px;
+}
+
+.circle-btn{
+	color: black;
+	max-height: 75px;
+	max-width: 75px;
 }
