@@ -63,7 +63,7 @@ if (!empty($_POST["data"])) {
             <img src="images/LogoText.png" class="img-fluid" width="225px" alt="logotest">
         </div>
 
-        <form class="mb-5" action="login.php" method="POST">
+        <form class="mb-5 d-flex flex-column" action="login.php" method="POST">
             <div class="mb-4">
                 <label for="memberId" class="form-label"></label>
                 <input type="text" class="form-control border-0 rounded-4 fw-bold" id="memberId" name="data[member_number]" placeholder="<?php echo !empty($resultMessage) ? $resultMessage : "Medlemsnummer"; ?>" style="height: 60px;" autocomplete="off">
