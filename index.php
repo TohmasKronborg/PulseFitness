@@ -58,7 +58,7 @@ if (!empty($workouts)) {
 
 <!-- Dims Nav -->
 <nav class="position-relative overflow-x-hidden">
-    <img src="images/dims.svg" alt="dims" class="" style="margin-top: -50px; margin-left: -175px;">
+    <img src="images/dims.svg" alt="dims" class="" style="margin-top: -50px; margin-left: -1px;">
     <a href="index.php"><img src="images/LogoWhite.png" alt="WhiteLogo" class="img-fluid position-absolute top-0 start-50 translate-middle mt-5" style="max-width: 100px;"></a>
 </nav>
 
