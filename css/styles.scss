@@ -58,3 +58,16 @@ body{
 	font-size: 12px;
 }
 
+nav{
+	background-image: url("images/dims2.svg");
+	background-repeat: no-repeat;
+	background-size: contain;
+	background-position: top left;
+
+	display: flex;
+}
+
+nav.image{
+	max-width: 100px;
+	margin: 30px auto 30px auto;
+}

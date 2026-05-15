@@ -43,11 +43,10 @@ $userId = $_SESSION['userId'];
         width: 54px;
     }
 </style>
-<body class="mx-auto overflow-hidden flex-column" style="max-width: 768px; height: 100vh">
+<body class="mx-auto overflow-x-hidden flex-column position-relative" style="max-width: 768px; height: 100vh">
 
 <!-- Dims Nav -->
-<nav class="position-relative flex-shrink-1 overflow-x-hidden">
-    <img src="images/dimsSecondary.svg" alt="dims" style="margin-top: -50px; margin-left: -175px;">
+<nav class="mb-4">
     <a href="index.php"><img src="images/LogoWhite.png" alt="WhiteLogo" class="img-fluid position-absolute top-0 start-50 translate-middle mt-5" style="max-width: 100px;"></a>
 </nav>
 

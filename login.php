@@ -6,28 +6,29 @@
 require "settings/init.php";
 
 session_start();
+
 $resultMessage = '';
 
 if (!empty($_POST["data"])) {
+
     $data = $_POST["data"];
+    $memberNumber = trim($data["member_number"] ?? '');
 
-    // Input field
-    $memberNumber = trim($data["member_number"]);
+    $sql = "SELECT member_id, member_name 
+            FROM members 
+            WHERE member_number = :member_number";
 
-    // Correct SQL
-    $sql = "SELECT member_id, member_name, member_number FROM members WHERE member_number = :member_number";
+    $stmt = $db->sql($sql, [
+        ":member_number" => $memberNumber
+    ], false);
 
-    $bind = [":member_number" => $memberNumber];
-
-    $stmt = $db->sql($sql, $bind, false);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Only check if member exists
     if ($user) {
         $_SESSION['userId'] = $user['member_id'];
         $_SESSION['username'] = $user['member_name'];
 
-        header("Location: index.php?=" . urlencode($user['member_name']));
+        header("Location: index.php");
         exit();
     } else {
         $resultMessage = "Ugyldigt medlemsnummer";
