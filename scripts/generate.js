@@ -1,4 +1,4 @@
-let i = 0; // current step index
+let i = 0;
 const max = 4;
 
 const nextBtn = document.querySelector("#btnNext");
@@ -11,10 +11,11 @@ const backBtnDiv = document.querySelector("#btnBackDiv");
 const btnFirstHome = document.querySelector("#btnFirstHome");
 const btnHome = document.querySelector("#btnHome");
 
-const steps = document.querySelectorAll(".step"); // your pages
+const steps = document.querySelectorAll(".step");
 const indicators = document.querySelectorAll(".step-indicator");
 
 function updateUI() {
+
     // STEP VISIBILITY
     steps.forEach((step, idx) => {
         step.style.display = idx === i ? "block" : "none";
@@ -22,14 +23,38 @@ function updateUI() {
 
     // INDICATOR STATE
     indicators.forEach((indicator, idx) => {
-        if (idx === i) {
+
+        if (idx <= i) {
             indicator.classList.add("bg-primary", "text-light");
             indicator.classList.remove("bg-white", "text-dark");
         } else {
             indicator.classList.remove("bg-primary", "text-light");
             indicator.classList.add("bg-white", "text-dark");
         }
+
     });
+
+    // BACK BUTTON STATE
+    if (i === 0) {
+        backBtnDiv.classList.add("d-none");
+        btnFirstHome.classList.remove("d-none");
+        btnHome.classList.add("d-none");
+    } else {
+        backBtnDiv.classList.remove("d-none");
+        btnFirstHome.classList.add("d-none");
+        btnHome.classList.remove("d-none");
+    }
+
+    // NEXT BUTTON STATE
+    if (i === max) {
+        nextBtnDiv.classList.add("d-none");
+        nextBtn2.classList.remove("d-none");
+    } else {
+        nextBtnDiv.classList.remove("d-none");
+        nextBtn2.classList.add("d-none");
+    }
+
+    console.log(i);
 }
 
 // NEXT
@@ -37,18 +62,6 @@ function next() {
     if (i < max) {
         i++;
         updateUI();
-        console.log(i);
-    }
-
-    if (i > 0) {
-        backBtnDiv.classList.remove("d-none")
-        btnFirstHome.classList.add("d-none")
-        btnHome.classList.remove("d-none")
-    }
-
-    if (i === max) {
-        nextBtnDiv.classList.add("d-none")
-        nextBtn2.classList.remove("d-none")
     }
 }
 
@@ -57,25 +70,19 @@ function back() {
     if (i > 0) {
         i--;
         updateUI();
-        console.log(i);
-    }
-
-    if (i === 0) {
-        backBtnDiv.classList.add("d-none")
-        btnFirstHome.classList.remove("d-none")
-        btnHome.classList.add("d-none")
-    }
-
-    if (i < max) {
-        nextBtnDiv.classList.remove("d-none")
-        nextBtn2.classList.add("d-none")
     }
 }
 
-// event listeners
-if (nextBtn) nextBtn.addEventListener("click", next);
-if (backBtn) backBtn.addEventListener("click", back);
+// BUTTON EVENTS
+if (nextBtn) {
+    nextBtn.addEventListener("click", next);
+}
 
+if (backBtn) {
+    backBtn.addEventListener("click", back);
+}
+
+// INDICATOR EVENTS
 indicators.forEach((indicator, idx) => {
     indicator.addEventListener("click", () => {
         i = idx;
@@ -83,5 +90,5 @@ indicators.forEach((indicator, idx) => {
     });
 });
 
-// initial render
+// INITIAL RENDER
 updateUI();

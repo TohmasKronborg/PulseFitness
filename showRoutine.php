@@ -42,12 +42,37 @@ $workouts = $db->sql("
 ]);
 
 ?>
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="utf-8">
 
-<h1><?= htmlspecialchars($program[0]->name) ?></h1>
+    <title>Færdig Rutine</title>
+
+    <meta name="robots" content="All">
+    <meta name="author" content="Udgiver">
+    <meta name="copyright" content="Information om copyright">
+
+    <link rel="stylesheet" href="css/styles.css" type="text/css">
+    <link rel="icon" href="images/LogoBlack.png">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body class="mx-auto flex-column position-relative overflow-x-hidden" style="max-width: 768px; height: 100vh; ">
+
+<!-- Top Nav -->
+<nav class="flex-column">
+    <div class="bg-primary flex-center h-auto">
+        <a class="mx-auto my-3" href="index.php"><img src="images/LogoWhite.png" alt="WhiteLogo" class="img-fluid" style="max-width: 100px;"></a>
+        <?php include "include/navButtons.php" ?>
+    </div>
+    <img src="images/VectorPrimary.svg" alt="dims">
+</nav>
 
 <?php foreach ($workouts as $workout): ?>
 
-    <h2>
+    <h2 class="montserrat fw-bold mt-5">
         Day <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
     </h2>
 
@@ -89,44 +114,6 @@ $workouts = $db->sql("
     <?php endif; ?>
 
 <?php endforeach; ?>
-
-<!DOCTYPE html>
-<html lang="da">
-<head>
-    <meta charset="utf-8">
-
-    <title>Færdig Rutine</title>
-
-    <meta name="robots" content="All">
-    <meta name="author" content="Udgiver">
-    <meta name="copyright" content="Information om copyright">
-
-    <link rel="stylesheet" href="css/styles.css" type="text/css">
-    <link rel="icon" href="images/LogoBlack.png">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-</head>
-
-<body class="mx-auto flex-column position-relative overflow-x-hidden" style="max-width: 768px; height: 100vh; ">
-
-<!-- Dims Nav -->
-<nav class="flex-column">
-    <div class="bg-primary flex-center h-auto">
-        <a class="mx-auto my-3" href="index.php"><img src="images/LogoWhite.png" alt="WhiteLogo" class="img-fluid" style="max-width: 100px;"></a>
-        <!-- Log Ud -->
-        <div class="d-flex gap-1 align-items-center position-absolute end-0 me-4">
-            <p class="text-center montserrat fw-bold m-0 text-white">Log Ud</p>
-            <a href="logout.php">
-                <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24" fill="none">
-                    <path fill-rule="evenodd" clip-rule="evenodd" d="M3.5 23.25C3.5 23.0511 3.57902 22.8603 3.71967 22.7197C3.86032 22.579 4.05109 22.5 4.25 22.5H19.75C19.9489 22.5 20.1397 22.579 20.2803 22.7197C20.421 22.8603 20.5 23.0511 20.5 23.25C20.5 23.4489 20.421 23.6397 20.2803 23.7803C20.1397 23.921 19.9489 24 19.75 24H4.25C4.05109 24 3.86032 23.921 3.71967 23.7803C3.57902 23.6397 3.5 23.4489 3.5 23.25ZM17.25 3H16.5V1.5H17.25C17.8467 1.5 18.419 1.73705 18.841 2.15901C19.2629 2.58097 19.5 3.15326 19.5 3.75V22.5H18V3.75C18 3.55109 17.921 3.36032 17.7803 3.21967C17.6397 3.07902 17.4489 3 17.25 3Z" fill="white"/>
-                    <path fill-rule="evenodd" clip-rule="evenodd" d="M16.242 0.183033C16.3231 0.253538 16.3881 0.340654 16.4327 0.43848C16.4772 0.536306 16.5001 0.642556 16.5 0.750033V22.5H15V1.61553L6 2.90103V22.5H4.5V2.25003C4.50003 2.06933 4.56529 1.89471 4.6838 1.7583C4.8023 1.62188 4.96608 1.53283 5.145 1.50753L15.645 0.00753321C15.7513 -0.00764386 15.8596 0.000170158 15.9626 0.0304471C16.0656 0.0607241 16.1608 0.112758 16.242 0.183033V0.183033Z" fill="white"/>
-                    <path d="M12 13C12 13.552 12.448 14 13 14C13.552 14 14 13.552 14 13C14 12.448 13.552 12 13 12C12.448 12 12 12.448 12 13Z" fill="white"/>
-                </svg>
-            </a>
-        </div>
-    </div>
-    <img src="images/VectorPrimary.svg" alt="dims">
-</nav>
 
 <!-- Bottom Nav -->
 <footer class="mt-auto rounded-top-circle bg-white position-sticky bottom-0" style="min-height: 85px;">
