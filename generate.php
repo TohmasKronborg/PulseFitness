@@ -28,11 +28,7 @@ if ($_POST) {
 
     $programName = "Generated Program";
 
-    /*
-    =====================================================
-    1. DELETE OLD DATA
-    =====================================================
-    */
+//    1. DELETE OLD DATA
 
     $db->sql("
         DELETE we
@@ -54,11 +50,7 @@ if ($_POST) {
         WHERE member_id = :member_id
     ", [":member_id" => $userId]);
 
-    /*
-    =====================================================
-    2. CREATE PROGRAM
-    =====================================================
-    */
+//    2. CREATE PROGRAM
 
     $db->sql("
         INSERT INTO training_programs
@@ -81,11 +73,7 @@ if ($_POST) {
 
     $programId = $programRow[0]->id;
 
-    /*
-    =====================================================
-    3. CREATE WORKOUTS
-    =====================================================
-    */
+//    3. CREATE WORKOUTS
 
     for ($i = 1; $i <= $days; $i++) {
 
@@ -112,11 +100,7 @@ if ($_POST) {
 
         $workoutId = $workoutRow[0]->id;
 
-        /*
-        =====================================================
-        4. GET LARGE CANDIDATE POOL
-        =====================================================
-        */
+//        4. GET LARGE CANDIDATE POOL
 
         $candidates = $db->sql("
             SELECT DISTINCT e.id, e.difficulty_id, e.goal_id
@@ -129,11 +113,7 @@ if ($_POST) {
             ":equipment_id" => $equipmentId
         ]);
 
-        /*
-        =====================================================
-        5. SCORE EACH EXERCISE (CORE LOGIC)
-        =====================================================
-        */
+//        5. SCORE EACH EXERCISE (CORE LOGIC)
 
         $scored = [];
 
@@ -149,9 +129,7 @@ if ($_POST) {
                 $score += 1;
             }
 
-            /*
-            fetch muscle match (lightweight check)
-            */
+//            fetch muscle match (lightweight check)
 
             $muscleMatch = $db->sql("
                 SELECT 1
@@ -174,21 +152,11 @@ if ($_POST) {
             ];
         }
 
-        /*
-        =====================================================
-        6. SORT BY SCORE
-        =====================================================
-        */
-
         usort($scored, function ($a, $b) {
             return $b['score'] <=> $a['score'];
         });
 
-        /*
-        =====================================================
-        7. PICK TOP EXERCISES
-        =====================================================
-        */
+//        7. PICK TOP EXERCISES
 
         $scored = array_slice($scored, 0, 8);
 
@@ -196,11 +164,7 @@ if ($_POST) {
             $scored = $db->sql("SELECT id FROM exercises LIMIT 5");
         }
 
-        /*
-        =====================================================
-        8. INSERT EXERCISES
-        =====================================================
-        */
+//        8. INSERT EXERCISES
 
         $exerciseIds = [];
         $order = 1;
@@ -223,11 +187,7 @@ if ($_POST) {
             $order++;
         }
 
-        /*
-        =====================================================
-        9. NAME WORKOUT FROM CONTENT
-        =====================================================
-        */
+//        9. NAME WORKOUT FROM CONTENT
 
         $muscleData = [];
 
