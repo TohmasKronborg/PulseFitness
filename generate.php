@@ -26,7 +26,7 @@ if ($_POST) {
         exit("Invalid input");
     }
 
-    $programName = "Generated Program";
+    $programName = "Genereret Program";
 
 //    1. DELETE OLD DATA
 
@@ -85,7 +85,7 @@ if ($_POST) {
         ", [
             ":program_id" => $programId,
             ":number" => $i,
-            ":name" => "Temporary"
+            ":name" => "Midlertidig"
         ]);
 
         $workoutRow = $db->sql("
@@ -212,11 +212,11 @@ if ($_POST) {
         $muscles = array_unique($muscles);
 
         if (count($muscles) === 1) {
-            $workoutName = $muscles[0] . " Workout";
+            $workoutName = $muscles[0] . " Rutine";
         } elseif (count($muscles) === 2) {
-            $workoutName = implode(" & ", $muscles) . " Workout";
+            $workoutName = implode(" og ", $muscles) . " Rutine";
         } else {
-            $workoutName = "Full Body Workout";
+            $workoutName = "Full Body Rutine";
         }
 
         $db->sql("
