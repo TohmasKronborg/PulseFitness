@@ -153,7 +153,7 @@ $workouts = $db->sql("
             ?>
 
             <!-- Dagens Rutine -->
-            <div class="col-12 d-md-flex justify-content-between align-items-center bg-white rounded-4 p-3">
+            <div class="col-12 d-sm-flex justify-content-between align-items-center bg-white rounded-4 p-3">
 
                 <div>
                     <h3 class="montserrat fw-bold mb-3 fs-4">

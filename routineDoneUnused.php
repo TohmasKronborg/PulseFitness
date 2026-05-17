@@ -14,7 +14,81 @@ if (empty($_SESSION['userId'])) {
 
 $userId = $_SESSION['userId'];
 
+// 1. Get latest program for user
+$program = $db->sql("
+    SELECT id, name
+    FROM training_programs
+    WHERE member_id = :member_id
+    ORDER BY id DESC
+    LIMIT 1
+", [
+    ":member_id" => $userId
+]);
+
+if (!$program) {
+    exit("No program found");
+}
+
+$programId = $program[0]->id;
+
+// 2. Get all workouts (days)
+$workouts = $db->sql("
+    SELECT id, workout_number, name
+    FROM workouts
+    WHERE program_id = :program_id
+    ORDER BY workout_number ASC
+", [
+    ":program_id" => $programId
+]);
+
 ?>
+
+<h1><?= htmlspecialchars($program[0]->name) ?></h1>
+
+<?php foreach ($workouts as $workout): ?>
+
+    <h2>
+        Day <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
+    </h2>
+
+    <?php
+    // 3. Get exercises per workout
+    $exercises = $db->sql("
+        SELECT 
+            e.name,
+            e.description,
+            we.exercise_order,
+            we.sets,
+            we.reps,
+            we.rest_seconds
+        FROM workout_exercises we
+        INNER JOIN exercises e ON we.exercise_id = e.id
+        WHERE we.workout_id = :workout_id
+        ORDER BY we.exercise_order ASC
+    ", [
+        ":workout_id" => $workout->id
+    ]);
+    ?>
+
+    <?php if (!$exercises): ?>
+        <p>No exercises found.</p>
+    <?php else: ?>
+
+        <ul>
+            <?php foreach ($exercises as $ex): ?>
+                <li>
+                    <strong><?= htmlspecialchars($ex->name) ?></strong><br>
+                    <?= htmlspecialchars($ex->description) ?><br>
+                    Sets: <?= (int)$ex->sets ?> |
+                    Reps: <?= (int)$ex->reps ?> |
+                    Rest: <?= (int)$ex->rest_seconds ?>s
+                </li>
+            <?php endforeach; ?>
+        </ul>
+
+    <?php endif; ?>
+
+<?php endforeach; ?>
 
 <!DOCTYPE html>
 <html lang="da">

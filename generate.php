@@ -14,6 +14,264 @@ if (empty($_SESSION['userId'])) {
 
 $userId = $_SESSION['userId'];
 
+if ($_POST) {
+
+    $difficultyId = (int)($_POST['difficulty'] ?? 0);
+    $goalId = (int)($_POST['goal'] ?? 0);
+    $equipmentId = (int)($_POST['equipment'] ?? 0);
+    $muscleGroupId = (int)($_POST['muscleGroup'] ?? 0);
+    $days = (int)($_POST['days'] ?? 0);
+
+    if ($days <= 0 || $difficultyId <= 0 || $goalId <= 0 || $equipmentId <= 0 || $muscleGroupId <= 0) {
+        exit("Invalid input");
+    }
+
+    $programName = "Generated Program";
+
+    /*
+    =====================================================
+    1. DELETE OLD DATA
+    =====================================================
+    */
+
+    $db->sql("
+        DELETE we
+        FROM workout_exercises we
+        INNER JOIN workouts w ON we.workout_id = w.id
+        INNER JOIN training_programs tp ON w.program_id = tp.id
+        WHERE tp.member_id = :member_id
+    ", [":member_id" => $userId]);
+
+    $db->sql("
+        DELETE w
+        FROM workouts w
+        INNER JOIN training_programs tp ON w.program_id = tp.id
+        WHERE tp.member_id = :member_id
+    ", [":member_id" => $userId]);
+
+    $db->sql("
+        DELETE FROM training_programs
+        WHERE member_id = :member_id
+    ", [":member_id" => $userId]);
+
+    /*
+    =====================================================
+    2. CREATE PROGRAM
+    =====================================================
+    */
+
+    $db->sql("
+        INSERT INTO training_programs
+        (member_id, name, workouts_per_week)
+        VALUES
+        (:member_id, :name, :days)
+    ", [
+        ":member_id" => $userId,
+        ":name" => $programName,
+        ":days" => $days
+    ]);
+
+    $programRow = $db->sql("
+        SELECT id
+        FROM training_programs
+        WHERE member_id = :member_id
+        ORDER BY id DESC
+        LIMIT 1
+    ", [":member_id" => $userId]);
+
+    $programId = $programRow[0]->id;
+
+    /*
+    =====================================================
+    3. CREATE WORKOUTS
+    =====================================================
+    */
+
+    for ($i = 1; $i <= $days; $i++) {
+
+        $db->sql("
+            INSERT INTO workouts
+            (program_id, workout_number, name)
+            VALUES
+            (:program_id, :number, :name)
+        ", [
+            ":program_id" => $programId,
+            ":number" => $i,
+            ":name" => "Temporary"
+        ]);
+
+        $workoutRow = $db->sql("
+            SELECT id
+            FROM workouts
+            WHERE program_id = :program_id
+            ORDER BY id DESC
+            LIMIT 1
+        ", [
+            ":program_id" => $programId
+        ]);
+
+        $workoutId = $workoutRow[0]->id;
+
+        /*
+        =====================================================
+        4. GET LARGE CANDIDATE POOL
+        =====================================================
+        */
+
+        $candidates = $db->sql("
+            SELECT DISTINCT e.id, e.difficulty_id, e.goal_id
+            FROM exercises e
+            INNER JOIN exercise_equipment ee ON e.id = ee.exercise_id
+            INNER JOIN exercise_muscle_groups emg ON e.id = emg.exercise_id
+            WHERE ee.equipment_id = :equipment_id
+            LIMIT 200
+        ", [
+            ":equipment_id" => $equipmentId
+        ]);
+
+        /*
+        =====================================================
+        5. SCORE EACH EXERCISE (CORE LOGIC)
+        =====================================================
+        */
+
+        $scored = [];
+
+        foreach ($candidates as $ex) {
+
+            $score = 0;
+
+            if ($ex->goal_id == $goalId) {
+                $score += 3;
+            }
+
+            if ($ex->difficulty_id == $difficultyId) {
+                $score += 1;
+            }
+
+            /*
+            fetch muscle match (lightweight check)
+            */
+
+            $muscleMatch = $db->sql("
+                SELECT 1
+                FROM exercise_muscle_groups
+                WHERE exercise_id = :eid
+                  AND muscle_group_id = :mg
+                LIMIT 1
+            ", [
+                ":eid" => $ex->id,
+                ":mg" => $muscleGroupId
+            ]);
+
+            if ($muscleMatch) {
+                $score += 2;
+            }
+
+            $scored[] = [
+                "id" => $ex->id,
+                "score" => $score
+            ];
+        }
+
+        /*
+        =====================================================
+        6. SORT BY SCORE
+        =====================================================
+        */
+
+        usort($scored, function ($a, $b) {
+            return $b['score'] <=> $a['score'];
+        });
+
+        /*
+        =====================================================
+        7. PICK TOP EXERCISES
+        =====================================================
+        */
+
+        $scored = array_slice($scored, 0, 8);
+
+        if (count($scored) === 0) {
+            $scored = $db->sql("SELECT id FROM exercises LIMIT 5");
+        }
+
+        /*
+        =====================================================
+        8. INSERT EXERCISES
+        =====================================================
+        */
+
+        $exerciseIds = [];
+        $order = 1;
+
+        foreach ($scored as $ex) {
+
+            $exerciseIds[] = (int)$ex['id'];
+
+            $db->sql("
+                INSERT INTO workout_exercises
+                (workout_id, exercise_id, exercise_order, sets, reps, rest_seconds)
+                VALUES
+                (:workout_id, :exercise_id, :exercise_order, 3, 10, 90)
+            ", [
+                ":workout_id" => $workoutId,
+                ":exercise_id" => $ex['id'],
+                ":exercise_order" => $order
+            ]);
+
+            $order++;
+        }
+
+        /*
+        =====================================================
+        9. NAME WORKOUT FROM CONTENT
+        =====================================================
+        */
+
+        $muscleData = [];
+
+        if (!empty($exerciseIds)) {
+
+            $in = implode(',', array_map('intval', $exerciseIds));
+
+            $muscleData = $db->sql("
+                SELECT DISTINCT mg.name
+                FROM muscle_groups mg
+                INNER JOIN exercise_muscle_groups emg ON mg.id = emg.muscle_group_id
+                WHERE emg.exercise_id IN ($in)
+            ");
+        }
+
+        $muscles = [];
+
+        foreach ($muscleData as $m) {
+            $muscles[] = $m->name;
+        }
+
+        $muscles = array_unique($muscles);
+
+        if (count($muscles) === 1) {
+            $workoutName = $muscles[0] . " Workout";
+        } elseif (count($muscles) === 2) {
+            $workoutName = implode(" & ", $muscles) . " Workout";
+        } else {
+            $workoutName = "Full Body Workout";
+        }
+
+        $db->sql("
+            UPDATE workouts
+            SET name = :name
+            WHERE id = :id
+        ", [
+            ":name" => $workoutName,
+            ":id" => $workoutId
+        ]);
+    }
+
+    header("Location: showRoutineDay.php?program_id=" . $programId . "&day=1");
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
@@ -122,14 +380,14 @@ $userId = $_SESSION['userId'];
 </div>
 
 <!-- THE form -->
-<form action="" class="container-fluid mt-5 mb-5">
+<form method="POST" class="container-fluid mt-5 mb-5">
 
     <!-- Difficulty Radios -->
     <div id="difficulty" class="step">
         <h2 class="montserrat fw-bold">Trænings Niveau</h2>
         <p class="text-gray">Hvad er dit trænings niveau?</p>
         <!-- Beginner -->
-        <input type="radio" class="btn-check" name="difficulty" id="beginner" autocomplete="off">
+        <input type="radio" class="btn-check" name="difficulty" id="beginner" autocomplete="off" value="1">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="beginner">
             <img src="images/icons/Beginner.svg" alt="BegynderIkon" class="img-fluid">
@@ -137,19 +395,19 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Øvet -->
-        <input type="radio" class="btn-check" name="difficulty" id="advanced" autocomplete="off">
+        <input type="radio" class="btn-check" name="difficulty" id="advanced" autocomplete="off" value="2">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="advanced">
             <img src="images/icons/Dumbbell.svg" alt="ØvetIkon" class="img-fluid">
             <span class="fs-1 montserrat fw-bold text-start">Øvet</span>
         </label>
 
-        <!-- Intermediat -->
-        <input type="radio" class="btn-check" name="difficulty" id="intermediate" autocomplete="off">
+        <!-- Avanceret -->
+        <input type="radio" class="btn-check" name="difficulty" id="avanceret" autocomplete="off" value="3">
 
-        <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="intermediate">
+        <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="avanceret">
             <img src="images/icons/Group.svg" alt="IntermediatIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Intermediat</span>
+            <span class="fs-1 montserrat fw-bold text-start">Avanceret</span>
         </label>
     </div>
 
@@ -157,8 +415,9 @@ $userId = $_SESSION['userId'];
     <div id="goal" class="step">
         <h2 class="montserrat fw-bold">Træningsmål</h2>
         <p class="text-gray">Hvad er dit træningsmål?</p>
+
         <!-- Styrketræning -->
-        <input type="radio" class="btn-check" name="goal" id="styrketræning" autocomplete="off">
+        <input type="radio" class="btn-check" name="goal" id="styrketræning" autocomplete="off" value="1">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="styrketræning">
             <img src="images/icons/anvil.svg" alt="BegynderIkon" class="img-fluid">
@@ -166,7 +425,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Muskelopbygning -->
-        <input type="radio" class="btn-check" name="goal" id="muskelopbygning" autocomplete="off">
+        <input type="radio" class="btn-check" name="goal" id="muskelopbygning" autocomplete="off" value="2">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="muskelopbygning">
             <img src="images/icons/muscle.svg" alt="ArmIkon" class="img-fluid">
@@ -174,7 +433,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Vægttab -->
-        <input type="radio" class="btn-check" name="goal" id="vægttab" autocomplete="off">
+        <input type="radio" class="btn-check" name="goal" id="vægttab" autocomplete="off" value="3">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="vægttab">
             <img src="images/icons/endocrine.svg" alt="flammeIkon" class="img-fluid">
@@ -182,7 +441,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Fysisk vedligeholdelse -->
-        <input type="radio" class="btn-check" name="goal" id="fysiskVedligeholdelse" autocomplete="off">
+        <input type="radio" class="btn-check" name="goal" id="fysiskVedligeholdelse" autocomplete="off" value="4">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="fysiskVedligeholdelse">
             <img src="images/icons/treadmil.svg" alt="løbeIkon" class="img-fluid">
@@ -190,7 +449,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Genoptræning -->
-        <input type="radio" class="btn-check" name="goal" id="genoptræning" autocomplete="off">
+        <input type="radio" class="btn-check" name="goal" id="genoptræning" autocomplete="off" value="5">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="genoptræning">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -203,7 +462,7 @@ $userId = $_SESSION['userId'];
         <h2 class="montserrat fw-bold">Udstyr</h2>
         <p class="text-gray">Hvad for noget udstyr vil du bruge?</p>
         <!-- Hele Centret -->
-        <input type="radio" class="btn-check" name="equipment" id="heleCentret" autocomplete="off">
+        <input type="radio" class="btn-check" name="equipment" id="heleCentret" autocomplete="off" value="1">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="heleCentret">
             <img src="images/icons/anvil.svg" alt="centerIkon" class="img-fluid">
@@ -211,7 +470,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Dumbbells & Barbells -->
-        <input type="radio" class="btn-check" name="equipment" id="dumbbells&Barbells" autocomplete="off">
+        <input type="radio" class="btn-check" name="equipment" id="dumbbells&Barbells" autocomplete="off" value="2">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="dumbbells&Barbells">
             <img src="images/icons/Dumbbell.svg" alt="dumbbellIkon" class="img-fluid">
@@ -219,7 +478,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Maskiner -->
-        <input type="radio" class="btn-check" name="equipment" id="maskiner" autocomplete="off">
+        <input type="radio" class="btn-check" name="equipment" id="maskiner" autocomplete="off" value="3">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="maskiner">
             <img src="images/icons/gear.svg" alt="tandhjulIkon" class="img-fluid">
@@ -227,7 +486,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Træningstilbehør -->
-        <input type="radio" class="btn-check" name="equipment" id="træningstilbehør" autocomplete="off">
+        <input type="radio" class="btn-check" name="equipment" id="træningstilbehør" autocomplete="off" value="4">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="træningstilbehør">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -241,7 +500,7 @@ $userId = $_SESSION['userId'];
         <h2 class="montserrat fw-bold">Muskelgrupper</h2>
         <p class="text-gray">Hvilke muskelgrupper vil du have fokus på?</p>
         <!-- Full Body -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="fullBody" autocomplete="off">
+        <input type="radio" class="btn-check" name="muscleGroup" id="fullBody" autocomplete="off" value="1">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="fullBody">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -249,7 +508,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Core -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="core" autocomplete="off">
+        <input type="radio" class="btn-check" name="muscleGroup" id="core" autocomplete="off" value="2">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="core">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -257,7 +516,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Arme -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="arme" autocomplete="off">
+        <input type="radio" class="btn-check" name="muscleGroup" id="arme" autocomplete="off" value="3">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="arme">
             <img src="images/icons/muscle.svg" alt="armIkon" class="img-fluid">
@@ -265,7 +524,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- ben -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="ben" autocomplete="off">
+        <input type="radio" class="btn-check" name="muscleGroup" id="ben" autocomplete="off" value="4">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="ben">
             <img src="images/icons/Leg.svg" alt="benIkon" class="img-fluid">
@@ -273,7 +532,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Bryst -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="bryst" autocomplete="off">
+        <input type="radio" class="btn-check" name="muscleGroup" id="bryst" autocomplete="off" value="5">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="bryst">
             <img src="images/icons/Chest.svg" alt="brystIkon" class="img-fluid">
@@ -281,7 +540,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Skulder -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="skulder" autocomplete="off">
+        <input type="radio" class="btn-check" name="muscleGroup" id="skulder" autocomplete="off" value="6">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="skulder">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -289,7 +548,7 @@ $userId = $_SESSION['userId'];
         </label>
 
         <!-- Ryg -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="ryg" autocomplete="off">
+        <input type="radio" class="btn-check" name="muscleGroup" id="ryg" autocomplete="off" value="7">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="ryg">
             <img src="images/icons/Back.svg" alt="backIkon" class="img-fluid">
@@ -301,48 +560,56 @@ $userId = $_SESSION['userId'];
     <div id="days" class="step">
         <h2 class="montserrat fw-bold">Hvor mange dage om ugen vil du træne?</h2>
         <!-- 1 day -->
-        <input type="radio" class="btn-check" name="days" id="1day" autocomplete="off">
+        <input type="radio" class="btn-check" name="days" id="1day" autocomplete="off" value="1">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="1day">
             <img src="images/icons/calendar/calendar-1.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-1 montserrat fw-bold text-start">Enkel Træning</span>
         </label>
 
         <!-- 2 days -->
-        <input type="radio" class="btn-check" name="days" id="2day" autocomplete="off">
+        <input type="radio" class="btn-check" name="days" id="2day" autocomplete="off" value="2">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="2day">
             <img src="images/icons/calendar/calendar-2.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-1 montserrat fw-bold text-start">2 dage om ugen</span>
         </label>
 
         <!-- 3 days -->
-        <input type="radio" class="btn-check" name="days" id="3day" autocomplete="off">
+        <input type="radio" class="btn-check" name="days" id="3day" autocomplete="off" value="3">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="3day">
             <img src="images/icons/calendar/calendar-3.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-1 montserrat fw-bold text-start">3 dage om ugen</span>
         </label>
 
         <!-- 4 days -->
-        <input type="radio" class="btn-check" name="days" id="4day" autocomplete="off">
+        <input type="radio" class="btn-check" name="days" id="4day" autocomplete="off" value="4">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="4day">
             <img src="images/icons/calendar/calendar-4.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-1 montserrat fw-bold text-start">4 dage om ugen</span>
         </label>
 
         <!-- 5 days -->
-        <input type="radio" class="btn-check" name="days" id="5day" autocomplete="off">
+        <input type="radio" class="btn-check" name="days" id="5day" autocomplete="off" value="5">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="5day">
             <img src="images/icons/calendar/calendar-5.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-1 montserrat fw-bold text-start">5 dage om ugen</span>
         </label>
 
         <!-- 6 days -->
-        <input type="radio" class="btn-check" name="days" id="6day" autocomplete="off">
+        <input type="radio" class="btn-check" name="days" id="6day" autocomplete="off" value="6">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="6day">
             <img src="images/icons/calendar/calendar-6.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-1 montserrat fw-bold text-start">6 dage om ugen</span>
         </label>
     </div>
+    <button class="p-3 bg-primary rounded-circle border-0" id="btnNext2">
+        <svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 45 45" fill="none">
+            <path fill-rule="evenodd" clip-rule="evenodd"
+                  d="M2.8125 22.5003C2.8125 22.1273 2.96066 21.7697 3.22438 21.5059C3.4881 21.2422 3.84579 21.0941 4.21875 21.0941L37.3866 21.0941L28.5356 12.2459C28.2716 11.9819 28.1232 11.6237 28.1232 11.2503C28.1232 10.8769 28.2716 10.5187 28.5356 10.2547C28.7997 9.99063 29.1578 9.84229 29.5313 9.84229C29.9047 9.84229 30.2628 9.99063 30.5269 10.2547L41.7769 21.5047C41.9078 21.6353 42.0117 21.7905 42.0826 21.9613C42.1535 22.1322 42.19 22.3153 42.19 22.5003C42.19 22.6853 42.1535 22.8684 42.0826 23.0393C42.0117 23.2101 41.9078 23.3653 41.7769 23.4959L30.5269 34.7459C30.2628 35.01 29.9047 35.1583 29.5313 35.1583C29.1578 35.1583 28.7997 35.01 28.5356 34.7459C28.2716 34.4819 28.1232 34.1237 28.1232 33.7503C28.1232 33.3769 28.2716 33.0187 28.5356 32.7547L37.3866 23.9066L4.21875 23.9066C3.84579 23.9066 3.4881 23.7584 3.22438 23.4947C2.96066 23.231 2.8125 22.8733 2.8125 22.5003V22.5003Z"
+                  fill="white"/>
+        </svg>
+    </button>
 </form>
+
 
 <!-- Bottom Nav -->
 <footer class="mt-auto rounded-top-circle bg-white position-sticky bottom-0" style="min-height: 85px;">
@@ -395,7 +662,7 @@ $userId = $_SESSION['userId'];
 
         <!-- Button Next 2 -->
         <div class="flex-column-center gap-1 d-none" id="btnNext2">
-            <button type="submit" class="p-3 bg-primary rounded-circle border-0" id="btnNext">
+            <button class="p-3 bg-primary rounded-circle border-0" id="btnNext2">
                 <svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 45 45" fill="none">
                     <path fill-rule="evenodd" clip-rule="evenodd"
                           d="M2.8125 22.5003C2.8125 22.1273 2.96066 21.7697 3.22438 21.5059C3.4881 21.2422 3.84579 21.0941 4.21875 21.0941L37.3866 21.0941L28.5356 12.2459C28.2716 11.9819 28.1232 11.6237 28.1232 11.2503C28.1232 10.8769 28.2716 10.5187 28.5356 10.2547C28.7997 9.99063 29.1578 9.84229 29.5313 9.84229C29.9047 9.84229 30.2628 9.99063 30.5269 10.2547L41.7769 21.5047C41.9078 21.6353 42.0117 21.7905 42.0826 21.9613C42.1535 22.1322 42.19 22.3153 42.19 22.5003C42.19 22.6853 42.1535 22.8684 42.0826 23.0393C42.0117 23.2101 41.9078 23.3653 41.7769 23.4959L30.5269 34.7459C30.2628 35.01 29.9047 35.1583 29.5313 35.1583C29.1578 35.1583 28.7997 35.01 28.5356 34.7459C28.2716 34.4819 28.1232 34.1237 28.1232 33.7503C28.1232 33.3769 28.2716 33.0187 28.5356 32.7547L37.3866 23.9066L4.21875 23.9066C3.84579 23.9066 3.4881 23.7584 3.22438 23.4947C2.96066 23.231 2.8125 22.8733 2.8125 22.5003V22.5003Z"
