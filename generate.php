@@ -28,7 +28,7 @@ if ($_POST) {
 
     $programName = "Genereret Program";
 
-// DELETE OLD DATA
+    // DELETE OLD DATA
 
     $db->sql("
         DELETE we
@@ -50,7 +50,7 @@ if ($_POST) {
         WHERE member_id = :member_id
     ", [":member_id" => $userId]);
 
-// CREATE PROGRAM
+    // CREATE PROGRAM
 
     $db->sql("
         INSERT INTO training_programs
@@ -73,124 +73,93 @@ if ($_POST) {
 
     $programId = $programRow[0]->id;
 
-// CREATE WORKOUTS
-
     $usedExercises = [];
+
+    // WORKOUT LOOP
 
     for ($i = 1; $i <= $days; $i++) {
 
-        // CREATE WORKOUT
-
         $db->sql("
-        INSERT INTO workouts
-        (program_id, workout_number, name)
-        VALUES
-        (:program_id, :number, :name)
-    ", [
+            INSERT INTO workouts
+            (program_id, workout_number, name)
+            VALUES
+            (:program_id, :number, :name)
+        ", [
             ":program_id" => $programId,
             ":number" => $i,
             ":name" => "Midlertidig"
         ]);
 
         $workoutRow = $db->sql("
-        SELECT id
-        FROM workouts
-        WHERE program_id = :program_id
-        ORDER BY id DESC
-        LIMIT 1
-    ", [
+            SELECT id
+            FROM workouts
+            WHERE program_id = :program_id
+            ORDER BY id DESC
+            LIMIT 1
+        ", [
             ":program_id" => $programId
         ]);
 
         $workoutId = $workoutRow[0]->id;
 
-        // EQUIPMENT LOGIC
-
-            // Hele Centret = access to ALL equipment
+        // EQUIPMENT FILTER
 
         if ($equipmentId == 1) {
-
             $equipmentSql = "";
             $params = [];
-
         } else {
-
             $equipmentSql = "AND ee.equipment_id = :equipment_id";
-
-            $params = [
-                ":equipment_id" => $equipmentId
-            ];
+            $params = [":equipment_id" => $equipmentId];
         }
 
-        // EXCLUDE PREVIOUSLY USED EXERCISES
+        // EXCLUDE USED EXERCISES
 
         $excludeSql = "";
-
         if (!empty($usedExercises)) {
-
             $excludeIds = implode(",", array_map("intval", $usedExercises));
-
             $excludeSql = "AND e.id NOT IN ($excludeIds)";
         }
 
         // GET CANDIDATES
 
         $query = "
-        SELECT DISTINCT
-            e.id,
-            e.name,
-            e.difficulty_id,
-            e.goal_id
-
-        FROM exercises e
-
-        INNER JOIN exercise_equipment ee
-            ON e.id = ee.exercise_id
-
-        INNER JOIN exercise_muscle_groups emg
-            ON e.id = emg.exercise_id
-
-        WHERE 1=1
-
-        $equipmentSql
-        $excludeSql
-
-        ORDER BY RAND()
-
-        LIMIT 200
-    ";
-
-        $candidates = $db->sql($query, $params);
-
-        // FALLBACK IF POOL EMPTY
-
-        if (empty($candidates)) {
-
-            $query = "
             SELECT DISTINCT
                 e.id,
                 e.name,
                 e.difficulty_id,
                 e.goal_id
-
             FROM exercises e
-
-            INNER JOIN exercise_equipment ee
-                ON e.id = ee.exercise_id
-
+            INNER JOIN exercise_equipment ee ON e.id = ee.exercise_id
+            INNER JOIN exercise_muscle_groups emg ON e.id = emg.exercise_id
             WHERE 1=1
-
             $equipmentSql
-
+            $excludeSql
             ORDER BY RAND()
-
             LIMIT 200
         ";
+
+        $candidates = $db->sql($query, $params);
+
+        if (empty($candidates)) {
+
+            $query = "
+                SELECT DISTINCT
+                    e.id,
+                    e.name,
+                    e.difficulty_id,
+                    e.goal_id
+                FROM exercises e
+                INNER JOIN exercise_equipment ee ON e.id = ee.exercise_id
+                WHERE 1=1
+                $equipmentSql
+                ORDER BY RAND()
+                LIMIT 200
+            ";
 
             $candidates = $db->sql($query, $params);
         }
 
-        // SCORE EXERCISES
+        // SCORING
 
         $scored = [];
 
@@ -198,27 +167,21 @@ if ($_POST) {
 
             $score = 0;
 
-            // GOAL MATCH
-
             if ($ex->goal_id == $goalId) {
                 $score += 5;
             }
-
-            // DIFFICULTY MATCH
 
             if ($ex->difficulty_id == $difficultyId) {
                 $score += 2;
             }
 
-            // MUSCLE MATCH
-
             $muscleMatch = $db->sql("
-            SELECT 1
-            FROM exercise_muscle_groups
-            WHERE exercise_id = :eid
-              AND muscle_group_id = :mg
-            LIMIT 1
-        ", [
+                SELECT 1
+                FROM exercise_muscle_groups
+                WHERE exercise_id = :eid
+                  AND muscle_group_id = :mg
+                LIMIT 1
+            ", [
                 ":eid" => $ex->id,
                 ":mg" => $muscleGroupId
             ]);
@@ -226,8 +189,6 @@ if ($_POST) {
             if ($muscleMatch) {
                 $score += 4;
             }
-
-            // RANDOMNESS BONUS
 
             $score += rand(0, 3);
 
@@ -238,88 +199,67 @@ if ($_POST) {
             ];
         }
 
-        // RANDOMIZE EQUAL SCORES
-
         shuffle($scored);
-
         usort($scored, function ($a, $b) {
             return $b['score'] <=> $a['score'];
         });
 
-        // VARIABLE EXERCISE COUNT
-
-        $exerciseCount = rand(5, 8);
-
-        if (count($scored) < $exerciseCount) {
-            $exerciseCount = count($scored);
-        }
-
+        $exerciseCount = min(count($scored), rand(5, 7));
         $selectedExercises = array_slice($scored, 0, $exerciseCount);
 
         // INSERT EXERCISES
 
         $exerciseIds = [];
-
         $order = 1;
 
         foreach ($selectedExercises as $ex) {
 
             $exerciseIds[] = (int)$ex['id'];
-
-            // STORE USED EXERCISES
             $usedExercises[] = (int)$ex['id'];
 
-            // DIFFERENT SETS/REPS BASED ON GOAL
+            // BASE VALUES (static baseline)
+            $sets = 3;
+            $reps = 10;
+            $rest = 90; // NEVER modified
+
+            // GOAL ADJUSTMENTS (NOW WITH -1 / -2 INCLUDED)
 
             switch ($goalId) {
 
-                // Styrketræning
-                case 1:
-                    $sets = 5;
-                    $reps = rand(3, 6);
-                    $rest = 180;
+                case 1: // Styrketræning (heavier load)
+                    $sets += 2;
+                    $reps -= 2;
                     break;
 
-                // Muskel opbygning
-                case 2:
-                    $sets = 4;
-                    $reps = rand(8, 12);
-                    $rest = 90;
+                case 2: // Muskelopbygning (slight increase volume)
+                    $sets += 1;
                     break;
 
-                // Vægttab
-                case 3:
-                    $sets = 3;
-                    $reps = rand(12, 20);
-                    $rest = 45;
+                case 3: // Vægttab (higher reps, slightly less sets)
+                    $sets -= 1;
+                    $reps += 2;
                     break;
 
-                // Fysisk vedligeholdelse
-                case 4:
-                    $sets = 3;
-                    $reps = rand(8, 15);
-                    $rest = 60;
+                case 4: // Vedligeholdelse
+                    // no change
                     break;
 
-                // Genoptræning
-                case 5:
-                    $sets = 2;
-                    $reps = rand(12, 15);
-                    $rest = 45;
+                case 5: // Genoptræning (reduced load)
+                    $sets -= 2;
+                    $reps -= 2;
                     break;
-
-                default:
-                    $sets = 3;
-                    $reps = 10;
-                    $rest = 90;
             }
 
+            // SAFETY LIMITS
+            $sets = max(1, min(6, $sets));
+            $reps = max(1, min(30, $reps));
+
             $db->sql("
-            INSERT INTO workout_exercises
-            (workout_id, exercise_id, exercise_order, sets, reps, rest_seconds)
-            VALUES
-            (:workout_id, :exercise_id, :exercise_order, :sets, :reps, :rest)
-        ", [
+                INSERT INTO workout_exercises
+                (workout_id, exercise_id, exercise_order, sets, reps, rest_seconds)
+                VALUES
+                (:workout_id, :exercise_id, :exercise_order, :sets, :reps, :rest)
+            ", [
                 ":workout_id" => $workoutId,
                 ":exercise_id" => $ex['id'],
                 ":exercise_order" => $order,
@@ -331,9 +271,7 @@ if ($_POST) {
             $order++;
         }
 
-        // -----------------------------------
-        // CREATE WORKOUT NAME
-        // -----------------------------------
+        // WORKOUT NAMING
 
         $muscleData = [];
 
@@ -342,12 +280,12 @@ if ($_POST) {
             $in = implode(',', array_map('intval', $exerciseIds));
 
             $muscleData = $db->sql("
-            SELECT DISTINCT mg.name
-            FROM muscle_groups mg
-            INNER JOIN exercise_muscle_groups emg
-                ON mg.id = emg.muscle_group_id
-            WHERE emg.exercise_id IN ($in)
-        ");
+                SELECT DISTINCT mg.name
+                FROM muscle_groups mg
+                INNER JOIN exercise_muscle_groups emg
+                    ON mg.id = emg.muscle_group_id
+                WHERE emg.exercise_id IN ($in)
+            ");
         }
 
         $muscles = [];
@@ -358,34 +296,23 @@ if ($_POST) {
 
         $muscles = array_unique($muscles);
 
-        // BETTER WORKOUT NAMING
-
         if (in_array("Bryst", $muscles) && in_array("Arme", $muscles)) {
-
             $workoutName = "Push Rutine";
-
         } elseif (in_array("Ryg", $muscles) && in_array("Arme", $muscles)) {
-
             $workoutName = "Pull Rutine";
-
         } elseif (in_array("Ben", $muscles)) {
-
             $workoutName = "Ben dag";
-
         } elseif (count($muscles) >= 4) {
-
             $workoutName = "Full Body Rutine";
-
         } else {
-
             $workoutName = implode(", ", array_slice($muscles, 0, 2)) . " Rutine";
         }
 
         $db->sql("
-        UPDATE workouts
-        SET name = :name
-        WHERE id = :id
-    ", [
+            UPDATE workouts
+            SET name = :name
+            WHERE id = :id
+        ", [
             ":name" => $workoutName,
             ":id" => $workoutId
         ]);

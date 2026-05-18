@@ -123,7 +123,7 @@ $totalWorkouts = $totalWorkouts[0]->total;
             <?php else: ?>
 
                 <div class="table-responsive mt-3">
-                    <table class="table align-middle">
+                    <table class="table table-sm align-middle">
                         <thead>
                         <tr>
                             <th>#</th>
