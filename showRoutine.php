@@ -81,51 +81,77 @@ $totalWorkouts = $totalWorkouts[0]->total;
 </nav>
 
 <!-- Routine Days -->
-<div class="container">
-    <h1 class="montserrat fw-bold mt-3 mb-5 text-center"> <?php echo $totalWorkouts ?> Rutiner genereret</h1>
-    <p></p>
+<div class="container mb-3">
+    <div class="mb-4 mt-3 text-center">
+        <h1 class="montserrat fw-bold"> <?php echo $totalWorkouts ?> Rutiner genereret</h1>
+        <p class="fs-5 text-gray"><?php echo $totalWorkouts ?> Rutiner fyldt med øvelser som passer dine behov</p>
+    </div>
     <?php foreach ($workouts as $workout): ?>
-        <div class="row bg-white rounded-4 p-3 mx-0 mb-3">
-            <h2 class="montserrat fw-bold ">
-                Day <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
-            </h2>
+        <div class="row bg-white rounded-4 p-3 mx-0 mb-4">
+            <div class="d-flex justify-content-between">
+                <h2 class="montserrat fw-bold text-secondary">
+                    Day <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
+                </h2>
+                <a  href="showRoutineDay.php?workout_id=<?= $workout->id ?>">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="25" height="25" viewBox="0 0 25 25" fill="none">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M1.5625 12.5003C1.5625 12.2931 1.64481 12.0943 1.79132 11.9478C1.93784 11.8013 2.13655 11.719 2.34375 11.719L20.7703 11.719L15.8531 6.80338C15.7064 6.65668 15.624 6.45772 15.624 6.25025C15.624 6.04279 15.7064 5.84383 15.8531 5.69713C15.9998 5.55043 16.1988 5.46802 16.4062 5.46802C16.6137 5.46802 16.8127 5.55043 16.9594 5.69713L23.2094 11.9471C23.2821 12.0197 23.3399 12.1059 23.3792 12.2008C23.4186 12.2957 23.4389 12.3975 23.4389 12.5003C23.4389 12.603 23.4186 12.7048 23.3792 12.7997C23.3399 12.8946 23.2821 12.9808 23.2094 13.0534L16.9594 19.3034C16.8127 19.4501 16.6137 19.5325 16.4062 19.5325C16.1988 19.5325 15.9998 19.4501 15.8531 19.3034C15.7064 19.1567 15.624 18.9577 15.624 18.7503C15.624 18.5428 15.7064 18.3438 15.8531 18.1971L20.7703 13.2815L2.34375 13.2815C2.13655 13.2815 1.93784 13.1992 1.79132 13.0527C1.64481 12.9062 1.5625 12.7075 1.5625 12.5003V12.5003Z" fill="#202437"/>
+                    </svg>
+                </a>
+            </div>
 
-        <?php
-        // 3. Get exercises per workout
-        $exercises = $db->sql("
-            SELECT
-                e.name,
-                e.description,
-                we.exercise_order,
-                we.sets,
-                we.reps,
-                we.rest_seconds
-            FROM workout_exercises we
-            INNER JOIN exercises e ON we.exercise_id = e.id
-            WHERE we.workout_id = :workout_id
-            ORDER BY we.exercise_order ASC
-        ", [
-            ":workout_id" => $workout->id
-        ]);
-        ?>
+            <?php
+            // 3. Get exercises per workout
+            $exercises = $db->sql("
+                SELECT
+                    e.name,
+                    e.description,
+                    we.exercise_order,
+                    we.sets,
+                    we.reps,
+                    we.rest_seconds
+                FROM workout_exercises we
+                INNER JOIN exercises e ON we.exercise_id = e.id
+                WHERE we.workout_id = :workout_id
+                ORDER BY we.exercise_order ASC
+            ", [
+                ":workout_id" => $workout->id
+            ]);
+            ?>
 
-        <?php if (!$exercises): ?>
-            <p>No exercises found.</p>
-        <?php else: ?>
+            <?php if (!$exercises): ?>
+                <p>Ingen Rutiner Fundet</p>
+            <?php else: ?>
 
-            <ul>
-                <?php foreach ($exercises as $ex): ?>
-                    <li>
-                        <strong><?= htmlspecialchars($ex->name) ?></strong><br>
-                        <?= htmlspecialchars($ex->description) ?><br>
-                        Sets: <?= (int)$ex->sets ?> |
-                        Reps: <?= (int)$ex->reps ?> |
-                        Rest: <?= (int)$ex->rest_seconds ?>s
-                    </li>
-                <?php endforeach; ?>
-            </ul>
+                <div class="table-responsive mt-3">
+                    <table class="table align-middle">
+                        <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Øvelser</th>
+                            <!-- <th>Beskrivelse</th> -->
+                            <th>Sets</th>
+                            <th>Reps</th>
+                            <th>Rest</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <?php foreach ($exercises as $index => $ex): ?>
+                            <tr>
+                                <td><?= (int)$ex->exercise_order ?></td>
+                                <td>
+                                    <strong><?= htmlspecialchars($ex->name) ?></strong>
+                                </td>
+                                <!-- <td> --> <?php //= htmlspecialchars($ex->description) ?> <!-- </td> -->
+                                <td><?= (int)$ex->sets ?></td>
+                                <td><?= (int)$ex->reps ?></td>
+                                <td><?= (int)$ex->rest_seconds ?>s</td>
+                            </tr>
+                        <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
 
-        <?php endif; ?>
+            <?php endif; ?>
 
         </div>
     <?php endforeach; ?>

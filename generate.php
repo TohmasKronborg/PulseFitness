@@ -28,7 +28,7 @@ if ($_POST) {
 
     $programName = "Genereret Program";
 
-//    1. DELETE OLD DATA
+// DELETE OLD DATA
 
     $db->sql("
         DELETE we
@@ -50,7 +50,7 @@ if ($_POST) {
         WHERE member_id = :member_id
     ", [":member_id" => $userId]);
 
-//    2. CREATE PROGRAM
+// CREATE PROGRAM
 
     $db->sql("
         INSERT INTO training_programs
@@ -73,47 +73,124 @@ if ($_POST) {
 
     $programId = $programRow[0]->id;
 
-//    3. CREATE WORKOUTS
+// CREATE WORKOUTS
+
+    $usedExercises = [];
 
     for ($i = 1; $i <= $days; $i++) {
 
+        // CREATE WORKOUT
+
         $db->sql("
-            INSERT INTO workouts
-            (program_id, workout_number, name)
-            VALUES
-            (:program_id, :number, :name)
-        ", [
+        INSERT INTO workouts
+        (program_id, workout_number, name)
+        VALUES
+        (:program_id, :number, :name)
+    ", [
             ":program_id" => $programId,
             ":number" => $i,
             ":name" => "Midlertidig"
         ]);
 
         $workoutRow = $db->sql("
-            SELECT id
-            FROM workouts
-            WHERE program_id = :program_id
-            ORDER BY id DESC
-            LIMIT 1
-        ", [
+        SELECT id
+        FROM workouts
+        WHERE program_id = :program_id
+        ORDER BY id DESC
+        LIMIT 1
+    ", [
             ":program_id" => $programId
         ]);
 
         $workoutId = $workoutRow[0]->id;
 
-//        4. GET LARGE CANDIDATE POOL
+        // EQUIPMENT LOGIC
 
-        $candidates = $db->sql("
-            SELECT DISTINCT e.id, e.difficulty_id, e.goal_id
+            // Hele Centret = access to ALL equipment
+
+        if ($equipmentId == 1) {
+
+            $equipmentSql = "";
+            $params = [];
+
+        } else {
+
+            $equipmentSql = "AND ee.equipment_id = :equipment_id";
+
+            $params = [
+                ":equipment_id" => $equipmentId
+            ];
+        }
+
+        // EXCLUDE PREVIOUSLY USED EXERCISES
+
+        $excludeSql = "";
+
+        if (!empty($usedExercises)) {
+
+            $excludeIds = implode(",", array_map("intval", $usedExercises));
+
+            $excludeSql = "AND e.id NOT IN ($excludeIds)";
+        }
+
+        // GET CANDIDATES
+
+        $query = "
+        SELECT DISTINCT
+            e.id,
+            e.name,
+            e.difficulty_id,
+            e.goal_id
+
+        FROM exercises e
+
+        INNER JOIN exercise_equipment ee
+            ON e.id = ee.exercise_id
+
+        INNER JOIN exercise_muscle_groups emg
+            ON e.id = emg.exercise_id
+
+        WHERE 1=1
+
+        $equipmentSql
+        $excludeSql
+
+        ORDER BY RAND()
+
+        LIMIT 200
+    ";
+
+        $candidates = $db->sql($query, $params);
+
+        // FALLBACK IF POOL EMPTY
+
+        if (empty($candidates)) {
+
+            $query = "
+            SELECT DISTINCT
+                e.id,
+                e.name,
+                e.difficulty_id,
+                e.goal_id
+
             FROM exercises e
-            INNER JOIN exercise_equipment ee ON e.id = ee.exercise_id
-            INNER JOIN exercise_muscle_groups emg ON e.id = emg.exercise_id
-            WHERE ee.equipment_id = :equipment_id
-            LIMIT 200
-        ", [
-            ":equipment_id" => $equipmentId
-        ]);
 
-//        5. SCORE EACH EXERCISE (CORE LOGIC)
+            INNER JOIN exercise_equipment ee
+                ON e.id = ee.exercise_id
+
+            WHERE 1=1
+
+            $equipmentSql
+
+            ORDER BY RAND()
+
+            LIMIT 200
+        ";
+
+            $candidates = $db->sql($query, $params);
+        }
+
+        // SCORE EXERCISES
 
         $scored = [];
 
@@ -121,73 +198,142 @@ if ($_POST) {
 
             $score = 0;
 
+            // GOAL MATCH
+
             if ($ex->goal_id == $goalId) {
-                $score += 3;
+                $score += 5;
             }
+
+            // DIFFICULTY MATCH
 
             if ($ex->difficulty_id == $difficultyId) {
-                $score += 1;
+                $score += 2;
             }
 
-//            fetch muscle match (lightweight check)
+            // MUSCLE MATCH
 
             $muscleMatch = $db->sql("
-                SELECT 1
-                FROM exercise_muscle_groups
-                WHERE exercise_id = :eid
-                  AND muscle_group_id = :mg
-                LIMIT 1
-            ", [
+            SELECT 1
+            FROM exercise_muscle_groups
+            WHERE exercise_id = :eid
+              AND muscle_group_id = :mg
+            LIMIT 1
+        ", [
                 ":eid" => $ex->id,
                 ":mg" => $muscleGroupId
             ]);
 
             if ($muscleMatch) {
-                $score += 2;
+                $score += 4;
             }
+
+            // RANDOMNESS BONUS
+
+            $score += rand(0, 3);
 
             $scored[] = [
                 "id" => $ex->id,
+                "name" => $ex->name,
                 "score" => $score
             ];
         }
+
+        // RANDOMIZE EQUAL SCORES
+
+        shuffle($scored);
 
         usort($scored, function ($a, $b) {
             return $b['score'] <=> $a['score'];
         });
 
-//        7. PICK TOP EXERCISES
+        // VARIABLE EXERCISE COUNT
 
-        $scored = array_slice($scored, 0, 8);
+        $exerciseCount = rand(5, 8);
 
-        if (count($scored) === 0) {
-            $scored = $db->sql("SELECT id FROM exercises LIMIT 5");
+        if (count($scored) < $exerciseCount) {
+            $exerciseCount = count($scored);
         }
 
-//        8. INSERT EXERCISES
+        $selectedExercises = array_slice($scored, 0, $exerciseCount);
+
+        // INSERT EXERCISES
 
         $exerciseIds = [];
+
         $order = 1;
 
-        foreach ($scored as $ex) {
+        foreach ($selectedExercises as $ex) {
 
             $exerciseIds[] = (int)$ex['id'];
 
+            // STORE USED EXERCISES
+            $usedExercises[] = (int)$ex['id'];
+
+            // DIFFERENT SETS/REPS BASED ON GOAL
+
+            switch ($goalId) {
+
+                // Styrketræning
+                case 1:
+                    $sets = 5;
+                    $reps = rand(3, 6);
+                    $rest = 180;
+                    break;
+
+                // Muskel opbygning
+                case 2:
+                    $sets = 4;
+                    $reps = rand(8, 12);
+                    $rest = 90;
+                    break;
+
+                // Vægttab
+                case 3:
+                    $sets = 3;
+                    $reps = rand(12, 20);
+                    $rest = 45;
+                    break;
+
+                // Fysisk vedligeholdelse
+                case 4:
+                    $sets = 3;
+                    $reps = rand(8, 15);
+                    $rest = 60;
+                    break;
+
+                // Genoptræning
+                case 5:
+                    $sets = 2;
+                    $reps = rand(12, 15);
+                    $rest = 45;
+                    break;
+
+                default:
+                    $sets = 3;
+                    $reps = 10;
+                    $rest = 90;
+            }
+
             $db->sql("
-                INSERT INTO workout_exercises
-                (workout_id, exercise_id, exercise_order, sets, reps, rest_seconds)
-                VALUES
-                (:workout_id, :exercise_id, :exercise_order, 3, 10, 90)
-            ", [
+            INSERT INTO workout_exercises
+            (workout_id, exercise_id, exercise_order, sets, reps, rest_seconds)
+            VALUES
+            (:workout_id, :exercise_id, :exercise_order, :sets, :reps, :rest)
+        ", [
                 ":workout_id" => $workoutId,
                 ":exercise_id" => $ex['id'],
-                ":exercise_order" => $order
+                ":exercise_order" => $order,
+                ":sets" => $sets,
+                ":reps" => $reps,
+                ":rest" => $rest
             ]);
 
             $order++;
         }
 
-//        9. NAME WORKOUT FROM CONTENT
+        // -----------------------------------
+        // CREATE WORKOUT NAME
+        // -----------------------------------
 
         $muscleData = [];
 
@@ -196,11 +342,12 @@ if ($_POST) {
             $in = implode(',', array_map('intval', $exerciseIds));
 
             $muscleData = $db->sql("
-                SELECT DISTINCT mg.name
-                FROM muscle_groups mg
-                INNER JOIN exercise_muscle_groups emg ON mg.id = emg.muscle_group_id
-                WHERE emg.exercise_id IN ($in)
-            ");
+            SELECT DISTINCT mg.name
+            FROM muscle_groups mg
+            INNER JOIN exercise_muscle_groups emg
+                ON mg.id = emg.muscle_group_id
+            WHERE emg.exercise_id IN ($in)
+        ");
         }
 
         $muscles = [];
@@ -211,19 +358,34 @@ if ($_POST) {
 
         $muscles = array_unique($muscles);
 
-        if (count($muscles) === 1) {
-            $workoutName = $muscles[0] . " Rutine";
-        } elseif (count($muscles) === 2) {
-            $workoutName = implode(" og ", $muscles) . " Rutine";
-        } else {
+        // BETTER WORKOUT NAMING
+
+        if (in_array("Bryst", $muscles) && in_array("Arme", $muscles)) {
+
+            $workoutName = "Push Rutine";
+
+        } elseif (in_array("Ryg", $muscles) && in_array("Arme", $muscles)) {
+
+            $workoutName = "Pull Rutine";
+
+        } elseif (in_array("Ben", $muscles)) {
+
+            $workoutName = "Ben dag";
+
+        } elseif (count($muscles) >= 4) {
+
             $workoutName = "Full Body Rutine";
+
+        } else {
+
+            $workoutName = implode(", ", array_slice($muscles, 0, 2)) . " Rutine";
         }
 
         $db->sql("
-            UPDATE workouts
-            SET name = :name
-            WHERE id = :id
-        ", [
+        UPDATE workouts
+        SET name = :name
+        WHERE id = :id
+    ", [
             ":name" => $workoutName,
             ":id" => $workoutId
         ]);
@@ -300,7 +462,7 @@ if ($_POST) {
 </div>
 
 <!-- THE form -->
-<form method="POST" class="container-fluid mt-5 mb-5" id="workoutForm">
+<form method="POST" class="container-fluid mt-4 mb-5" id="workoutForm">
 
     <!-- Difficulty Radios -->
     <div id="difficulty" class="step">
@@ -311,7 +473,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="beginner">
             <img src="images/icons/Beginner.svg" alt="BegynderIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Begynder</span>
+            <span class="fs-4 montserrat fw-bold text-start">Begynder</span>
         </label>
 
         <!-- Øvet -->
@@ -319,7 +481,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="advanced">
             <img src="images/icons/Dumbbell.svg" alt="ØvetIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Øvet</span>
+            <span class="fs-4 montserrat fw-bold text-start">Øvet</span>
         </label>
 
         <!-- Avanceret -->
@@ -327,7 +489,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="avanceret">
             <img src="images/icons/Group.svg" alt="IntermediatIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Avanceret</span>
+            <span class="fs-4 montserrat fw-bold text-start">Avanceret</span>
         </label>
     </div>
 
@@ -341,7 +503,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="styrketræning">
             <img src="images/icons/anvil.svg" alt="BegynderIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Styrketræning</span>
+            <span class="fs-4 montserrat fw-bold text-start">Styrketræning</span>
         </label>
 
         <!-- Muskelopbygning -->
@@ -349,7 +511,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="muskelopbygning">
             <img src="images/icons/muscle.svg" alt="ArmIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Muskelopbygning</span>
+            <span class="fs-4 montserrat fw-bold text-start">Muskelopbygning</span>
         </label>
 
         <!-- Vægttab -->
@@ -357,7 +519,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="vægttab">
             <img src="images/icons/endocrine.svg" alt="flammeIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Vægttab</span>
+            <span class="fs-4 montserrat fw-bold text-start">Vægttab</span>
         </label>
 
         <!-- Fysisk vedligeholdelse -->
@@ -365,7 +527,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="fysiskVedligeholdelse">
             <img src="images/icons/treadmil.svg" alt="løbeIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Fysisk Vedligeholdelse</span>
+            <span class="fs-4 montserrat fw-bold text-start">Fysisk Vedligeholdelse</span>
         </label>
 
         <!-- Genoptræning -->
@@ -373,7 +535,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="genoptræning">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Genoptræning</span>
+            <span class="fs-4 montserrat fw-bold text-start">Genoptræning</span>
         </label>
     </div>
 
@@ -385,8 +547,8 @@ if ($_POST) {
         <input type="radio" class="btn-check" name="equipment" id="heleCentret" autocomplete="off" value="1">
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="heleCentret">
-            <img src="images/icons/anvil.svg" alt="centerIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Hele Centret</span>
+            <img src="images/icons/shop.svg" alt="centerIkon" class="img-fluid">
+            <span class="fs-4 montserrat fw-bold text-start">Hele Centret</span>
         </label>
 
         <!-- Dumbbells & Barbells -->
@@ -394,7 +556,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="dumbbells&Barbells">
             <img src="images/icons/Dumbbell.svg" alt="dumbbellIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Dumbbells & Barbells</span>
+            <span class="fs-4 montserrat fw-bold text-start">Dumbbells & Barbells</span>
         </label>
 
         <!-- Maskiner -->
@@ -402,7 +564,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="maskiner">
             <img src="images/icons/gear.svg" alt="tandhjulIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Maskiner</span>
+            <span class="fs-4 montserrat fw-bold text-start">Maskiner</span>
         </label>
 
         <!-- Træningstilbehør -->
@@ -410,7 +572,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="træningstilbehør">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Træningstilbehør</span>
+            <span class="fs-4 montserrat fw-bold text-start">Træningstilbehør</span>
         </label>
     </div>
 
@@ -424,7 +586,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="fullBody">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Full Body</span>
+            <span class="fs-4 montserrat fw-bold text-start">Full Body</span>
         </label>
 
         <!-- Core -->
@@ -432,7 +594,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="core">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Core</span>
+            <span class="fs-4 montserrat fw-bold text-start">Core</span>
         </label>
 
         <!-- Arme -->
@@ -440,7 +602,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="arme">
             <img src="images/icons/muscle.svg" alt="armIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Arme</span>
+            <span class="fs-4 montserrat fw-bold text-start">Arme</span>
         </label>
 
         <!-- ben -->
@@ -448,7 +610,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="ben">
             <img src="images/icons/Leg.svg" alt="benIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Ben</span>
+            <span class="fs-4 montserrat fw-bold text-start">Ben</span>
         </label>
 
         <!-- Bryst -->
@@ -456,7 +618,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="bryst">
             <img src="images/icons/Chest.svg" alt="brystIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Bryst</span>
+            <span class="fs-4 montserrat fw-bold text-start">Bryst</span>
         </label>
 
         <!-- Skulder -->
@@ -464,7 +626,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="skulder">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Skulder</span>
+            <span class="fs-4 montserrat fw-bold text-start">Skulder</span>
         </label>
 
         <!-- Ryg -->
@@ -472,7 +634,7 @@ if ($_POST) {
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="ryg">
             <img src="images/icons/Back.svg" alt="backIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Ryg</span>
+            <span class="fs-4 montserrat fw-bold text-start">Ryg</span>
         </label>
     </div>
 
@@ -483,42 +645,42 @@ if ($_POST) {
         <input type="radio" class="btn-check" name="days" id="1day" autocomplete="off" value="1">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="1day">
             <img src="images/icons/calendar/calendar-1.svg" alt="calendarIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">Enkel Træning</span>
+            <span class="fs-4 montserrat fw-bold text-start">Enkel Træning</span>
         </label>
 
         <!-- 2 days -->
         <input type="radio" class="btn-check" name="days" id="2day" autocomplete="off" value="2">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="2day">
             <img src="images/icons/calendar/calendar-2.svg" alt="calendarIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">2 dage om ugen</span>
+            <span class="fs-4 montserrat fw-bold text-start">2 dage om ugen</span>
         </label>
 
         <!-- 3 days -->
         <input type="radio" class="btn-check" name="days" id="3day" autocomplete="off" value="3">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="3day">
             <img src="images/icons/calendar/calendar-3.svg" alt="calendarIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">3 dage om ugen</span>
+            <span class="fs-4 montserrat fw-bold text-start">3 dage om ugen</span>
         </label>
 
         <!-- 4 days -->
         <input type="radio" class="btn-check" name="days" id="4day" autocomplete="off" value="4">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="4day">
             <img src="images/icons/calendar/calendar-4.svg" alt="calendarIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">4 dage om ugen</span>
+            <span class="fs-4 montserrat fw-bold text-start">4 dage om ugen</span>
         </label>
 
         <!-- 5 days -->
         <input type="radio" class="btn-check" name="days" id="5day" autocomplete="off" value="5">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="5day">
             <img src="images/icons/calendar/calendar-5.svg" alt="calendarIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">5 dage om ugen</span>
+            <span class="fs-4 montserrat fw-bold text-start">5 dage om ugen</span>
         </label>
 
         <!-- 6 days -->
         <input type="radio" class="btn-check" name="days" id="6day" autocomplete="off" value="6">
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="6day">
             <img src="images/icons/calendar/calendar-6.svg" alt="calendarIkon" class="img-fluid">
-            <span class="fs-1 montserrat fw-bold text-start">6 dage om ugen</span>
+            <span class="fs-4 montserrat fw-bold text-start">6 dage om ugen</span>
         </label>
     </div>
 </form>
