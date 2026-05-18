@@ -14,73 +14,17 @@ if (empty($_SESSION['userId'])) {
 
 $userId = $_SESSION['userId'];
 
-$workoutId = $_GET['workout_id'] ?? null;
-
-if (!$workoutId) {
-    exit("Missing workout_id");
-}
-
-/* Get workout info */
-$workout = $db->sql("
-    SELECT id, workout_number, name, program_id
-    FROM workouts
-    WHERE id = :id
-    LIMIT 1
-", [
-    ":id" => $workoutId
-]);
-
-if (!$workout) {
-    exit("Workout not found");
-}
-
-$workout = $workout[0];
-
-/* Get exercises for THIS workout only */
-$exercises = $db->sql("
-    SELECT 
-        e.name,
-        e.description,
-        we.exercise_order,
-        we.sets,
-        we.reps,
-        we.rest_seconds
-    FROM workout_exercises we
-    INNER JOIN exercises e ON we.exercise_id = e.id
-    WHERE we.workout_id = :workout_id
-    ORDER BY we.exercise_order ASC
-", [
-    ":workout_id" => $workoutId
-]);
-
 ?>
+
 <!DOCTYPE html>
 <html lang="da">
 <head>
     <meta charset="utf-8">
-
-    <title>Færdig Rutine</title>
-
-    <meta name="robots" content="All">
-    <meta name="author" content="Udgiver">
-    <meta name="copyright" content="Information om copyright">
-
-    <link rel="stylesheet" href="css/styles.css" type="text/css">
-    <link rel="icon" href="images/LogoBlack.png">
-
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= htmlspecialchars($workout->name) ?></title>
+    <link rel="stylesheet" href="css/styles.css">
 </head>
 
-<body class="mx-auto flex-column position-relative overflow-x-hidden" style="max-width: 768px; height: 100vh; ">
-
-<!-- Top Nav -->
-<nav class="flex-column">
-    <div class="bg-info flex-center h-auto">
-        <a class="mx-auto my-3" href="index.php"><img src="images/LogoWhite.png" alt="WhiteLogo" class="img-fluid" style="max-width: 100px;"></a>
-        <?php include "include/navButtons.php" ?>
-    </div>
-    <img src="images/VectorInfo.svg" alt="dims">
-</nav>
+<body>
 
 <h1>
     Day <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
@@ -103,7 +47,6 @@ $exercises = $db->sql("
     </ul>
 
 <?php endif; ?>
-
 
 <!-- Bottom Nav -->
 <footer class="mt-auto rounded-top-circle bg-white position-sticky bottom-0" style="min-height: 85px;">
@@ -150,7 +93,5 @@ $exercises = $db->sql("
     </div>
 </footer>
 
-<script src="scripts/canvas.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
