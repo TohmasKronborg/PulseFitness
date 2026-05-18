@@ -4,7 +4,6 @@
  */
 
 require "settings/init.php";
-
 session_start();
 
 if (empty($_SESSION['userId'])) {
@@ -14,6 +13,71 @@ if (empty($_SESSION['userId'])) {
 
 $userId = $_SESSION['userId'];
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+    $name = trim($_POST['name'] ?? '');
+
+    $difficulty_id = (int)($_POST['difficulty_id'] ?? 0);
+    $goal_id = (int)($_POST['goal_id'] ?? 0);
+
+    $equipment_id = !empty($_POST['equipment_id']) ? (int)$_POST['equipment_id'] : null;
+    $muscle_group_id = !empty($_POST['muscle_group_id']) ? (int)$_POST['muscle_group_id'] : null;
+
+    $is_global = !isset($_POST['is_global']) ? 1 : 0;
+
+    if (!isset($userId)) {
+        die("User not authenticated");
+    }
+
+    if ($name === '' || !$difficulty_id || !$goal_id) {
+        die("Missing required fields");
+    }
+
+    // escape only name (your DB layer is unsafe for binds)
+    $name = addslashes($name);
+
+    // -------------------------
+    // INSERT EXERCISE (RAW SQL ONLY)
+    // -------------------------
+    $db->sql("
+        INSERT INTO exercises
+            (name, difficulty_id, goal_id, created_by_member_id, is_global)
+        VALUES
+            ('$name', $difficulty_id, $goal_id, $userId, $is_global)
+    ");
+
+    // get last inserted id safely (works even with broken wrapper)
+    $res = $db->sql("SELECT LAST_INSERT_ID() AS id", []);
+    $exerciseId = is_array($res) ? $res[0]->id : $res->id;
+
+    if (!$exerciseId) {
+        die("Failed to create exercise");
+    }
+
+    // -------------------------
+    // RELATIONS (RAW SQL)
+    // -------------------------
+    if ($equipment_id) {
+        $db->sql("
+            INSERT INTO exercise_equipment
+                (exercise_id, equipment_id)
+            VALUES
+                ($exerciseId, $equipment_id)
+        ");
+    }
+
+    if ($muscle_group_id) {
+        $db->sql("
+            INSERT INTO exercise_muscle_groups
+                (exercise_id, muscle_group_id)
+            VALUES
+                ($exerciseId, $muscle_group_id)
+        ");
+    }
+
+    header("Location: index.php");
+    exit();
+}
 ?>
 
 <!DOCTYPE html>
@@ -35,66 +99,147 @@ $userId = $_SESSION['userId'];
 
 <body class="mx-auto flex-column position-relative overflow-x-hidden" style="max-width: 768px; height: 100vh; ">
 
-<!-- Dims Nav -->
+<!-- Top Nav -->
 <nav class="flex-column">
-    <div class="bg-primary flex-center h-auto">
+    <div class="bg-info flex-center h-auto">
         <a class="mx-auto my-3" href="index.php"><img src="images/LogoWhite.png" alt="WhiteLogo" class="img-fluid" style="max-width: 100px;"></a>
-        <!-- Log Ud -->
-        <div class="d-flex gap-1 align-items-center position-absolute end-0 me-4">
-            <p class="text-center montserrat fw-bold m-0 text-white">Log Ud</p>
-            <a href="logout.php">
-                <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 24 24" fill="none">
-                    <path fill-rule="evenodd" clip-rule="evenodd" d="M3.5 23.25C3.5 23.0511 3.57902 22.8603 3.71967 22.7197C3.86032 22.579 4.05109 22.5 4.25 22.5H19.75C19.9489 22.5 20.1397 22.579 20.2803 22.7197C20.421 22.8603 20.5 23.0511 20.5 23.25C20.5 23.4489 20.421 23.6397 20.2803 23.7803C20.1397 23.921 19.9489 24 19.75 24H4.25C4.05109 24 3.86032 23.921 3.71967 23.7803C3.57902 23.6397 3.5 23.4489 3.5 23.25ZM17.25 3H16.5V1.5H17.25C17.8467 1.5 18.419 1.73705 18.841 2.15901C19.2629 2.58097 19.5 3.15326 19.5 3.75V22.5H18V3.75C18 3.55109 17.921 3.36032 17.7803 3.21967C17.6397 3.07902 17.4489 3 17.25 3Z" fill="white"/>
-                    <path fill-rule="evenodd" clip-rule="evenodd" d="M16.242 0.183033C16.3231 0.253538 16.3881 0.340654 16.4327 0.43848C16.4772 0.536306 16.5001 0.642556 16.5 0.750033V22.5H15V1.61553L6 2.90103V22.5H4.5V2.25003C4.50003 2.06933 4.56529 1.89471 4.6838 1.7583C4.8023 1.62188 4.96608 1.53283 5.145 1.50753L15.645 0.00753321C15.7513 -0.00764386 15.8596 0.000170158 15.9626 0.0304471C16.0656 0.0607241 16.1608 0.112758 16.242 0.183033V0.183033Z" fill="white"/>
-                    <path d="M12 13C12 13.552 12.448 14 13 14C13.552 14 14 13.552 14 13C14 12.448 13.552 12 13 12C12.448 12 12 12.448 12 13Z" fill="white"/>
-                </svg>
-            </a>
-        </div>
+        <?php include "include/navButtons.php" ?>
     </div>
-    <img src="images/VectorPrimary.svg" alt="dims">
+    <img src="images/VectorInfo.svg" alt="dims">
 </nav>
+
+<form id="addExerciseForm" method="POST" class="container mb-5">
+
+    <h1 class="montserrat fw-bold mt-4 mb-4">Tilføj Øvelse</h1>
+
+    <!-- Visibility -->
+    <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" id="is_global" name="is_global" value="1">
+        <label class="form-check-label" for="is_global">Er øvelsen kun synlig for dig?</label>
+    </div>
+
+    <!-- Name -->
+    <div class="mb-3">
+        <label for="exercise_name" class="form-label"></label>
+        <input
+            id="exercise_name"
+            class="form-control p-3"
+            type="text"
+            name="name"
+            placeholder="Øvelsens Navn"
+            required
+        >
+    </div>
+
+    <!-- Difficulty -->
+    <div class="row">
+
+        <div class="col-sm-6 mb-3">
+            <label for="difficulty_id" class="form-label"></label>
+            <select id="difficulty_id" class="form-select p-3" name="difficulty_id" required>
+                <option value="">Niveau</option>
+                <option value="1">Begynder</option>
+                <option value="2">Øvet</option>
+                <option value="3">Avanceret</option>
+            </select>
+        </div>
+
+        <div class="col-sm-6 mb-3">
+            <label for="muscle_group_id" class="form-label"></label>
+            <select id="muscle_group_id" class="form-select p-3" name="muscle_group_id" required>
+                <option value="">Muskelgruppe</option>
+                <option value="1">Full body</option>
+                <option value="2">Core</option>
+                <option value="3">Arme</option>
+                <option value="4">Ben</option>
+                <option value="5">Bryst</option>
+                <option value="6">Skulder</option>
+                <option value="7">Ryg</option>
+            </select>
+        </div>
+
+    </div>
+
+    <!-- Goal + Equipment -->
+    <div class="row">
+
+        <div class="col-sm-6 mb-3">
+            <label for="goal_id" class="form-label"></label>
+            <select id="goal_id" class="form-select p-3" name="goal_id" required>
+                <option value="">Fitness mål</option>
+                <option value="1">Styrketræning</option>
+                <option value="2">Muskelopbygning</option>
+                <option value="3">Vægttab</option>
+                <option value="4">Fysisk Vedligeholdelse</option>
+                <option value="5">Genoptræning</option>
+            </select>
+        </div>
+
+        <div class="col-sm-6 mb-3">
+            <label for="equipment_id" class="form-label"></label>
+            <select id="equipment_id" class="form-select p-3" name="equipment_id" required>
+                <option value="">Udstyr</option>
+                <option value="1">Hele Centret</option>
+                <option value="2">Dumbbells & Barbells</option>
+                <option value="3">Maskiner</option>
+                <option value="4">Træningstilbehør</option>
+            </select>
+        </div>
+
+    </div>
+
+    <!-- Sets / Reps / Rest -->
+    <div class="row">
+
+        <div class="col-sm-4 mb-3">
+            <label for="sets" class="form-label"></label>
+            <input id="sets" class="form-control p-3" type="number" name="sets" placeholder="Sets">
+        </div>
+
+        <div class="col-sm-4 mb-3">
+            <label for="reps" class="form-label"></label>
+            <input id="reps" class="form-control p-3" type="text" name="reps" placeholder="Reps">
+        </div>
+
+        <div class="col-sm-4 mb-3">
+            <label for="rest_seconds" class="form-label"></label>
+            <input id="rest_seconds" class="form-control p-3" type="number" name="rest_seconds" placeholder="Hviletid (sek)">
+        </div>
+
+    </div>
+
+</form>
 
 <!-- Bottom Nav -->
 <footer class="mt-auto rounded-top-circle bg-white position-sticky bottom-0" style="min-height: 85px;">
-    <div class="d-flex justify-content-center gap-5" style="margin-top: -25px; margin-bottom: 25px;">
-        <!-- Add Button -->
+    <div class="d-flex justify-content-around" style="margin-top: -25px; margin-bottom: 25px;">
+        <!-- Back BTN -->
         <div class="flex-column-center gap-1" >
-            <a class="p-3 bg-secondary rounded-circle" href="generate.php">
-                <svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 45 45" fill="none">
+            <a class="p-3 bg-secondary rounded-circle" href="index.php">
+                <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 45 45" fill="none">
                     <path fill-rule="evenodd" clip-rule="evenodd"
-                          d="M22.5 4C23.1133 4 23.7015 4.24364 24.1352 4.67732C24.5689 5.11099 24.8125 5.69919 24.8125 6.3125V20.1875H38.6875C39.3008 20.1875 39.889 20.4311 40.3227 20.8648C40.7564 21.2985 41 21.8867 41 22.5C41 23.1133 40.7564 23.7015 40.3227 24.1352C39.889 24.5689 39.3008 24.8125 38.6875 24.8125H24.8125V38.6875C24.8125 39.3008 24.5689 39.889 24.1352 40.3227C23.7015 40.7564 23.1133 41 22.5 41C21.8867 41 21.2985 40.7564 20.8648 40.3227C20.4311 39.889 20.1875 39.3008 20.1875 38.6875V24.8125H6.3125C5.69919 24.8125 5.11099 24.5689 4.67732 24.1352C4.24364 23.7015 4 23.1133 4 22.5C4 21.8867 4.24364 21.2985 4.67732 20.8648C5.11099 20.4311 5.69919 20.1875 6.3125 20.1875H20.1875V6.3125C20.1875 5.69919 20.4311 5.11099 20.8648 4.67732C21.2985 4.24364 21.8867 4 22.5 4V4Z"
+                          d="M42.1875 22.4997C42.1875 22.8727 42.0393 23.2303 41.7756 23.4941C41.5119 23.7578 41.1542 23.9059 40.7813 23.9059L7.61344 23.9059L16.4644 32.7541C16.7284 33.0181 16.8768 33.3763 16.8768 33.7497C16.8768 34.1231 16.7284 34.4813 16.4644 34.7453C16.2003 35.0094 15.8422 35.1577 15.4688 35.1577C15.0953 35.1577 14.7372 35.0094 14.4731 34.7453L3.22313 23.4953C3.09217 23.3647 2.98827 23.2095 2.91737 23.0387C2.84648 22.8678 2.80999 22.6847 2.80999 22.4997C2.80999 22.3147 2.84648 22.1316 2.91737 21.9607C2.98827 21.7899 3.09217 21.6347 3.22313 21.5041L14.4731 10.2541C14.7372 9.99001 15.0953 9.84166 15.4688 9.84166C15.8422 9.84166 16.2003 9.99001 16.4644 10.2541C16.7284 10.5181 16.8768 10.8763 16.8768 11.2497C16.8768 11.6231 16.7284 11.9813 16.4644 12.2453L7.61344 21.0934L40.7813 21.0934C41.1542 21.0934 41.5119 21.2416 41.7756 21.5053C42.0393 21.769 42.1875 22.1267 42.1875 22.4997V22.4997Z"
                           fill="white"/>
                 </svg>
             </a>
-            <p class="text-center montserrat fw-bold m-0 text-nowrap">Tilføj Øvelse</p>
+            <p class="text-center montserrat fw-bold m-0 text-nowrap">Tilbage</p>
         </div>
 
-        <!-- Start Button -->
+        <!-- Tilføj Øvelse -->
         <div class="flex-column-center gap-1" >
-            <a class="p-3 bg-primary rounded-circle" href="generate.php">
-                <svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 45 45" fill="none">
-                    <path d="M38.3941 4.06112L35.8598 1.58075C34.8178 0.539769 33.467 0 32.0905 0C30.714 0 29.2989 0.539769 28.2569 1.58075C27.5622 2.27474 27.1377 3.1101 26.9061 3.99686C26.533 3.91975 26.1728 3.82979 25.774 3.82979C24.3975 3.82979 22.9824 4.3053 21.9404 5.34628C19.8563 7.42825 19.8563 10.8596 21.9404 12.9416L23.4584 14.4581L14.4533 23.4542L12.9352 21.9377C11.8932 20.8968 10.5425 20.357 9.16595 20.357C7.78945 20.357 6.37436 20.8968 5.33233 21.9377C3.98156 23.2872 3.5313 25.2021 3.9301 26.9499C3.06818 27.1684 2.24485 27.5668 1.56304 28.2479C-0.521012 30.3299 -0.521012 33.7612 1.56304 35.8432L1.61449 35.8946L4.03302 38.375L6.61878 40.9582L9.15309 43.4385C11.2371 45.5205 14.672 45.5205 16.756 43.4385C17.4378 42.7574 17.8624 41.9349 18.1068 41.0738C19.8435 41.4465 21.7217 41.0096 23.0596 39.673C25.1437 37.591 25.1437 34.1596 23.0596 32.0777L21.5416 30.5612L30.5467 21.565L32.0648 23.0815C34.1488 25.1635 37.5836 25.1635 39.6677 23.0815C40.9927 21.745 41.443 19.8558 41.0699 18.1337C41.9447 17.8895 42.7551 17.4654 43.437 16.7842C45.521 14.7023 45.521 11.2709 43.437 9.18892L40.9541 6.65715L38.3684 4.07397L38.3941 4.06112ZM32.0776 3.61131C32.5279 3.61131 32.9653 3.76553 33.3126 4.11252L40.9155 11.7078C41.6231 12.4147 41.6231 13.4814 40.9155 14.1882C40.208 14.895 39.0888 14.895 38.3812 14.1882L30.8298 6.65715C30.1222 5.95031 30.1222 4.83221 30.8298 4.12537C31.1771 3.77838 31.6145 3.62416 32.0648 3.62416L32.0776 3.61131ZM25.774 7.37684C26.2243 7.37684 26.6617 7.58247 27.009 7.94231L37.0948 18.0051C37.8023 18.712 37.8023 19.8301 37.0948 20.5369C36.3872 21.2438 35.3323 21.1795 34.6119 20.4855H34.5605L24.4747 10.4227C23.7672 9.71584 23.8315 8.662 24.5262 7.94231C24.8735 7.60817 25.3238 7.37684 25.7612 7.37684H25.774ZM25.9927 17.0027L28.0253 19.0333L19.0202 28.0294L16.9876 25.9989L25.9927 17.0027ZM9.15309 23.9683C9.60334 23.9683 10.0407 24.1739 10.3881 24.5338H10.4395L20.5253 34.5966C21.2328 35.3034 21.1685 36.3573 20.4738 37.077C19.7663 37.7453 18.6985 37.771 17.991 37.077L16.756 35.8432L16.5244 35.6761L9.15309 28.2479L7.9181 27.0141C7.21055 26.3073 7.21055 25.1892 7.9181 24.4824C8.26544 24.1354 8.70283 23.9812 9.15309 23.9812V23.9683ZM5.33233 30.2656C5.78259 30.2656 6.27144 30.4712 6.63165 30.8311L14.1831 38.3621C14.8907 39.069 14.8907 40.1871 14.1831 40.8939C13.4756 41.6007 12.4207 41.6007 11.7003 40.8939L4.09734 33.2986C3.38979 32.5917 3.38979 31.5251 4.09734 30.8182C4.44468 30.4712 4.88208 30.2528 5.33233 30.2528V30.2656Z"
-                          fill="white"/>
-                </svg>
-            </a>
-            <p class="text-center montserrat fw-bold m-0 text-nowrap">Start Rutine</p>
-        </div>
-
-        <!-- Generate Button -->
-        <div class="flex-column-center gap-1" >
-            <a class="p-3 bg-info rounded-circle" href="generate.php">
-                <svg xmlns="http://www.w3.org/2000/svg" width="45" height="45" viewBox="0 0 45 45" fill="none">
-                    <g clip-path="url(#clip0_135_504)">
-                        <path fill-rule="evenodd" clip-rule="evenodd" d="M31.644 0.191028C31.9193 0.350604 32.1323 0.598812 32.2482 0.895102C32.3642 1.19139 32.3763 1.51825 32.2824 1.82228L27.2171 18.281H36.5631C36.8377 18.2809 37.1064 18.3612 37.3359 18.5121C37.5654 18.6629 37.7458 18.8777 37.8547 19.1298C37.9635 19.382 37.9962 19.6605 37.9486 19.931C37.901 20.2015 37.7752 20.4521 37.5868 20.652L15.0868 44.5582C14.8691 44.7897 14.5794 44.9407 14.2649 44.9864C13.9504 45.0322 13.6297 44.9701 13.3551 44.8103C13.0804 44.6504 12.868 44.4023 12.7524 44.1062C12.6368 43.8102 12.625 43.4837 12.7187 43.1801L17.784 26.7185H8.43806C8.16341 26.7186 7.89473 26.6383 7.6652 26.4875C7.43567 26.3366 7.25534 26.1219 7.14646 25.8697C7.03759 25.6176 7.00493 25.3391 7.05253 25.0686C7.10013 24.7981 7.2259 24.5474 7.41431 24.3476L29.9143 0.44134C30.1318 0.21015 30.421 0.0593143 30.735 0.0133578C31.0491 -0.0325986 31.3694 0.0290272 31.644 0.188215V0.191028Z" fill="white"/>
+            <button type="submit" form="addExerciseForm" class="p-3 bg-primary rounded-circle border-0">
+                <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
+                    <g clip-path="url(#clip0_247_303)">
+                        <path fill-rule="evenodd" clip-rule="evenodd" d="M6.26643 32.4842C6.0958 33.4554 7.05393 34.2145 7.8983 33.7814L17.5014 28.8464L27.1024 33.7814C27.9467 34.2145 28.9049 33.4554 28.7342 32.4864L26.9186 22.1395L34.6252 14.7983C35.3449 14.1114 34.9708 12.8558 34.0061 12.7201L23.2917 11.1976L18.5142 1.73232C18.4232 1.54045 18.2796 1.37834 18.1002 1.26483C17.9207 1.15132 17.7127 1.09106 17.5003 1.09106C17.288 1.09106 17.08 1.15132 16.9005 1.26483C16.721 1.37834 16.5774 1.54045 16.4864 1.73232L11.7089 11.1998L0.994554 12.7223C0.0298669 12.8579 -0.344196 14.1136 0.375492 14.8004L8.08205 22.1417L6.26643 32.4886V32.4842ZM16.9961 26.4314L8.93299 30.5745L10.4511 21.9186C10.4867 21.7193 10.4728 21.5144 10.4106 21.3218C10.3484 21.1291 10.2399 20.9547 10.0946 20.8139L3.73768 14.7545L12.6014 13.4945C12.785 13.4668 12.9591 13.395 13.1088 13.2853C13.2585 13.1756 13.3794 13.0312 13.4611 12.8645L17.5014 4.86263L21.5396 12.8645C21.6213 13.0312 21.7422 13.1756 21.8919 13.2853C22.0416 13.395 22.2157 13.4668 22.3992 13.4945L31.263 14.7523L24.9061 20.8117C24.7603 20.9527 24.6514 21.1274 24.5892 21.3205C24.5271 21.5135 24.5134 21.719 24.5496 21.9186L26.0677 30.5745L18.0046 26.4314C17.8486 26.351 17.6758 26.309 17.5003 26.309C17.3249 26.309 17.152 26.351 16.9961 26.4314Z" fill="white"/>
                     </g>
                     <defs>
-                        <clipPath id="clip0_135_504">
-                            <rect width="45" height="45" fill="white"/>
+                        <clipPath id="clip0_247_303">
+                            <rect width="35" height="35" fill="white"/>
                         </clipPath>
                     </defs>
                 </svg>
-            </a>
-            <p class="text-center montserrat fw-bold m-0">Generer</p>
+            </button>
+            <p class="text-center montserrat fw-bold m-0">Tilføj</p>
         </div>
     </div>
 </footer>

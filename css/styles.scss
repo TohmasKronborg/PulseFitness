@@ -16,6 +16,7 @@ $info: #E93C79;
 // 4. Include any default map overrides here
 $custom-colors: (
 	"farve": $cyan-400,
+	"grays": #5E626F,
 );
 
 $theme-colors: map-merge($theme-colors, $custom-colors);
