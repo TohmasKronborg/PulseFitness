@@ -89,7 +89,7 @@ $totalWorkouts = $totalWorkouts[0]->total;
     <?php foreach ($workouts as $workout): ?>
         <div class="row bg-white rounded-4 p-3 mx-0 mb-4">
             <div class="d-flex justify-content-between">
-                <h2 class="montserrat fw-bold text-secondary">
+                <h2 class="montserrat fw-bold text-dark">
                     Day <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
                 </h2>
                 <a  href="showRoutineDay.php?workout_id=<?= $workout->id ?>">
