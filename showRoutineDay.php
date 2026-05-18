@@ -140,27 +140,57 @@ $nextId = $nav->next_id ?? $nav->first_id;
     <img src="images/VectorInfo.svg" alt="dims">
 </nav>
 
-<h1>
+<h1 class="montserrat fw-bold my-5 mb-4 ms-3">
     Day <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
 </h1>
 
-<?php if (empty($exercises)): ?>
-    <p>No exercises found.</p>
-<?php else: ?>
+<div class="container p-0">
 
-    <ul>
-        <?php foreach ($exercises as $ex): ?>
-            <li>
-                <strong><?= htmlspecialchars($ex->name) ?></strong><br>
-                <?= htmlspecialchars($ex->description) ?><br>
-                Sets: <?= (int)$ex->sets ?> |
-                Reps: <?= (int)$ex->reps ?> |
-                Rest: <?= (int)$ex->rest_seconds ?>s
-            </li>
-        <?php endforeach; ?>
-    </ul>
+    <div class="row bg-white rounded-4 p-3 mx-0 mb-5">
+    <!--    <div class="d-flex justify-content-between">-->
+    <!--        <h2 class="montserrat fw-bold text-dark">-->
+    <!--            Exercises-->
+    <!--        </h2>-->
+    <!--    </div>-->
 
-<?php endif; ?>
+        <?php if (empty($exercises)): ?>
+            <p>No exercises found.</p>
+        <?php else: ?>
+
+            <div class="table-responsive mt-3">
+                <table class="table align-middle">
+                    <thead>
+                    <tr>
+    <!--                    <th>#</th>-->
+                        <th>Exercise</th>
+                        <th>Description</th>
+                        <th class="p-0">Sets & Reps</th>
+    <!--                    <th>Reps</th>-->
+    <!--                    <th>Rest</th>-->
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($exercises as $index => $ex): ?>
+                        <tr>
+    <!--                        <td>--><?php //= $index + 1 ?><!--</td>-->
+                            <td>
+                                <strong><?= htmlspecialchars($ex->name) ?></strong>
+                            </td>
+                            <td>
+                                <?= htmlspecialchars($ex->description) ?>
+                            </td>
+                            <td><?= (int)$ex->sets . "X" . (int)$ex->reps ?></td>
+                            <!-- <td>--><?php //= (int)$ex->reps ?><!--</td>-->
+                            <!-- <td>--><?php //= (int)$ex->rest_seconds ?><!--s</td>-->
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+
+        <?php endif; ?>
+    </div>
+</div>
 
 
 <!-- Bottom Nav -->
