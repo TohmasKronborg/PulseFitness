@@ -20,7 +20,7 @@ if (!$workoutId) {
     exit("Missing workout_id");
 }
 
-//1. GET WORKOUT (SECURED TO USER OWNERSHIP)
+//1. GET WORKOUT
 
 $workout = $db->sql("
     SELECT w.id, w.workout_number, w.name, w.program_id
@@ -173,7 +173,7 @@ $total_workouts = $total_workouts[0]->total_workouts;
 <div class="container">
     <div class="row">
         <?php for ($i = 1; $i <= $total_workouts; $i++): ?>
-            <div style="height: 5px; margin-left: 6px; margin-right: 6px;" class="showRoutineDayIndicator rounded-4 col <?= ($i == $workout->workout_number) ? 'bg-primary' : 'bg-white' ?>"></div>
+            <div class="showRoutineDayIndicator rounded-4 col <?= ($i == $workout->workout_number) ? 'bg-primary' : 'bg-white' ?>"></div>
         <?php endfor; ?>
     </div>
     <p class="mt-2">Dag <?= (int)$workout->workout_number ?> ud af <?= $total_workouts ?></p>
