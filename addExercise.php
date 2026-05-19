@@ -16,6 +16,7 @@ $userId = $_SESSION['userId'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $name = trim($_POST['name'] ?? '');
+    $description = trim($_POST['description'] ?? '');
 
     $difficulty_id = (int)($_POST['difficulty_id'] ?? 0);
     $goal_id = (int)($_POST['goal_id'] ?? 0);
@@ -36,14 +37,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // escape only name (your DB layer is unsafe for binds)
     $name = addslashes($name);
 
-    // -------------------------
     // INSERT EXERCISE (RAW SQL ONLY)
-    // -------------------------
+
     $db->sql("
         INSERT INTO exercises
-            (name, difficulty_id, goal_id, created_by_member_id, is_global)
+            (name, description, difficulty_id, goal_id, created_by_member_id, is_global)
         VALUES
-            ('$name', $difficulty_id, $goal_id, $userId, $is_global)
+            ('$name', '$description', $difficulty_id, $goal_id, $userId, $is_global)
     ");
 
     // get last inserted id safely (works even with broken wrapper)
@@ -54,9 +54,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Failed to create exercise");
     }
 
-    // -------------------------
     // RELATIONS (RAW SQL)
-    // -------------------------
+
     if ($equipment_id) {
         $db->sql("
             INSERT INTO exercise_equipment
@@ -118,22 +117,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <label class="form-check-label" for="is_global">Er øvelsen kun synlig for dig?</label>
     </div>
 
-    <!-- Name -->
-    <div class="mb-3">
-        <label for="exercise_name" class="form-label"></label>
-        <input
-            id="exercise_name"
-            class="form-control p-3"
-            type="text"
-            name="name"
-            placeholder="Øvelsens Navn"
-            required
-        >
+    <!-- Name & Description -->
+    <div class="row">
+        <div class="mb-3 col-sm">
+            <label for="exercise_name" class="form-label"></label>
+            <input id="exercise_name" class="form-control p-3" type="text" name="name" placeholder="Øvelsens Navn" required>
+        </div>
+
+        <div class="mb-3 col-sm">
+            <label for="exercise_desc" class="form-label"></label>
+            <textarea id="exercise_desc" class="form-control p-3" name="description" placeholder="Beskrivelse af øvelsen" required></textarea>
+        </div>
+
+
     </div>
 
     <!-- Difficulty -->
     <div class="row">
-
         <div class="col-sm-6 mb-3">
             <label for="difficulty_id" class="form-label"></label>
             <select id="difficulty_id" class="form-select p-3" name="difficulty_id" required>
@@ -157,12 +157,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <option value="7">Ryg</option>
             </select>
         </div>
-
     </div>
 
     <!-- Goal + Equipment -->
     <div class="row">
-
         <div class="col-sm-6 mb-3">
             <label for="goal_id" class="form-label"></label>
             <select id="goal_id" class="form-select p-3" name="goal_id" required>
@@ -185,7 +183,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <option value="4">Træningstilbehør</option>
             </select>
         </div>
-
     </div>
 
     <!-- Sets / Reps / Rest -->

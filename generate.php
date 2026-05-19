@@ -396,7 +396,7 @@ if ($_POST) {
         <h2 class="montserrat fw-bold">Trænings Niveau</h2>
         <p class="text-gray">Hvad er dit trænings niveau?</p>
         <!-- Beginner -->
-        <input type="radio" class="btn-check" name="difficulty" id="beginner" autocomplete="off" value="1">
+        <input type="radio" class="btn-check" name="difficulty" id="beginner" autocomplete="off" value="1" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="beginner">
             <img src="images/icons/Beginner.svg" alt="BegynderIkon" class="img-fluid">
@@ -404,7 +404,7 @@ if ($_POST) {
         </label>
 
         <!-- Øvet -->
-        <input type="radio" class="btn-check" name="difficulty" id="advanced" autocomplete="off" value="2">
+        <input type="radio" class="btn-check" name="difficulty" id="advanced" autocomplete="off" value="2" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="advanced">
             <img src="images/icons/Dumbbell.svg" alt="ØvetIkon" class="img-fluid">
@@ -412,7 +412,7 @@ if ($_POST) {
         </label>
 
         <!-- Avanceret -->
-        <input type="radio" class="btn-check" name="difficulty" id="avanceret" autocomplete="off" value="3">
+        <input type="radio" class="btn-check" name="difficulty" id="avanceret" autocomplete="off" value="3" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="avanceret">
             <img src="images/icons/Group.svg" alt="IntermediatIkon" class="img-fluid">
@@ -426,7 +426,7 @@ if ($_POST) {
         <p class="text-gray">Hvad er dit træningsmål?</p>
 
         <!-- Styrketræning -->
-        <input type="radio" class="btn-check" name="goal" id="styrketræning" autocomplete="off" value="1">
+        <input type="radio" class="btn-check" name="goal" id="styrketræning" autocomplete="off" value="1" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="styrketræning">
             <img src="images/icons/anvil.svg" alt="BegynderIkon" class="img-fluid">
@@ -434,7 +434,7 @@ if ($_POST) {
         </label>
 
         <!-- Muskelopbygning -->
-        <input type="radio" class="btn-check" name="goal" id="muskelopbygning" autocomplete="off" value="2">
+        <input type="radio" class="btn-check" name="goal" id="muskelopbygning" autocomplete="off" value="2" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="muskelopbygning">
             <img src="images/icons/muscle.svg" alt="ArmIkon" class="img-fluid">
@@ -442,7 +442,7 @@ if ($_POST) {
         </label>
 
         <!-- Vægttab -->
-        <input type="radio" class="btn-check" name="goal" id="vægttab" autocomplete="off" value="3">
+        <input type="radio" class="btn-check" name="goal" id="vægttab" autocomplete="off" value="3" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="vægttab">
             <img src="images/icons/endocrine.svg" alt="flammeIkon" class="img-fluid">
@@ -450,7 +450,7 @@ if ($_POST) {
         </label>
 
         <!-- Fysisk vedligeholdelse -->
-        <input type="radio" class="btn-check" name="goal" id="fysiskVedligeholdelse" autocomplete="off" value="4">
+        <input type="radio" class="btn-check" name="goal" id="fysiskVedligeholdelse" autocomplete="off" value="4" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="fysiskVedligeholdelse">
             <img src="images/icons/treadmil.svg" alt="løbeIkon" class="img-fluid">
@@ -458,7 +458,7 @@ if ($_POST) {
         </label>
 
         <!-- Genoptræning -->
-        <input type="radio" class="btn-check" name="goal" id="genoptræning" autocomplete="off" value="5">
+        <input type="radio" class="btn-check" name="goal" id="genoptræning" autocomplete="off" value="5" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="genoptræning">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -471,7 +471,7 @@ if ($_POST) {
         <h2 class="montserrat fw-bold">Udstyr</h2>
         <p class="text-gray">Hvad for noget udstyr vil du bruge?</p>
         <!-- Hele Centret -->
-        <input type="radio" class="btn-check" name="equipment" id="heleCentret" autocomplete="off" value="1">
+        <input type="radio" class="btn-check" name="equipment" id="heleCentret" autocomplete="off" value="1" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="heleCentret">
             <img src="images/icons/shop.svg" alt="centerIkon" class="img-fluid">
@@ -479,7 +479,7 @@ if ($_POST) {
         </label>
 
         <!-- Dumbbells & Barbells -->
-        <input type="radio" class="btn-check" name="equipment" id="dumbbells&Barbells" autocomplete="off" value="2">
+        <input type="radio" class="btn-check" name="equipment" id="dumbbells&Barbells" autocomplete="off" value="2" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="dumbbells&Barbells">
             <img src="images/icons/Dumbbell.svg" alt="dumbbellIkon" class="img-fluid">
@@ -487,7 +487,7 @@ if ($_POST) {
         </label>
 
         <!-- Maskiner -->
-        <input type="radio" class="btn-check" name="equipment" id="maskiner" autocomplete="off" value="3">
+        <input type="radio" class="btn-check" name="equipment" id="maskiner" autocomplete="off" value="3" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="maskiner">
             <img src="images/icons/gear.svg" alt="tandhjulIkon" class="img-fluid">
@@ -495,7 +495,7 @@ if ($_POST) {
         </label>
 
         <!-- Træningstilbehør -->
-        <input type="radio" class="btn-check" name="equipment" id="træningstilbehør" autocomplete="off" value="4">
+        <input type="radio" class="btn-check" name="equipment" id="træningstilbehør" autocomplete="off" value="4" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="træningstilbehør">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -509,7 +509,7 @@ if ($_POST) {
         <h2 class="montserrat fw-bold">Muskelgrupper</h2>
         <p class="text-gray">Hvilke muskelgrupper vil du have fokus på?</p>
         <!-- Full Body -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="fullBody" autocomplete="off" value="1">
+        <input type="radio" class="btn-check" name="muscleGroup" id="fullBody" autocomplete="off" value="1" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="fullBody">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -517,7 +517,7 @@ if ($_POST) {
         </label>
 
         <!-- Core -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="core" autocomplete="off" value="2">
+        <input type="radio" class="btn-check" name="muscleGroup" id="core" autocomplete="off" value="2" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="core">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -525,7 +525,7 @@ if ($_POST) {
         </label>
 
         <!-- Arme -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="arme" autocomplete="off" value="3">
+        <input type="radio" class="btn-check" name="muscleGroup" id="arme" autocomplete="off" value="3" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="arme">
             <img src="images/icons/muscle.svg" alt="armIkon" class="img-fluid">
@@ -533,7 +533,7 @@ if ($_POST) {
         </label>
 
         <!-- ben -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="ben" autocomplete="off" value="4">
+        <input type="radio" class="btn-check" name="muscleGroup" id="ben" autocomplete="off" value="4" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="ben">
             <img src="images/icons/Leg.svg" alt="benIkon" class="img-fluid">
@@ -541,7 +541,7 @@ if ($_POST) {
         </label>
 
         <!-- Bryst -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="bryst" autocomplete="off" value="5">
+        <input type="radio" class="btn-check" name="muscleGroup" id="bryst" autocomplete="off" value="5" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="bryst">
             <img src="images/icons/Chest.svg" alt="brystIkon" class="img-fluid">
@@ -549,7 +549,7 @@ if ($_POST) {
         </label>
 
         <!-- Skulder -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="skulder" autocomplete="off" value="6">
+        <input type="radio" class="btn-check" name="muscleGroup" id="skulder" autocomplete="off" value="6" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="skulder">
             <img src="images/icons/bullseye.svg" alt="skydeIkon" class="img-fluid">
@@ -557,7 +557,7 @@ if ($_POST) {
         </label>
 
         <!-- Ryg -->
-        <input type="radio" class="btn-check" name="muscleGroup" id="ryg" autocomplete="off" value="7">
+        <input type="radio" class="btn-check" name="muscleGroup" id="ryg" autocomplete="off" value="7" required>
 
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="ryg">
             <img src="images/icons/Back.svg" alt="backIkon" class="img-fluid">
@@ -569,42 +569,42 @@ if ($_POST) {
     <div id="days" class="step">
         <h2 class="montserrat fw-bold fs-1 mb-4">Hvor mange dage om ugen vil du træne?</h2>
         <!-- 1 day -->
-        <input type="radio" class="btn-check" name="days" id="1day" autocomplete="off" value="1">
+        <input type="radio" class="btn-check" name="days" id="1day" autocomplete="off" value="1" required>
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100" for="1day">
             <img src="images/icons/calendar/calendar-1.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-4 montserrat fw-bold text-start">Enkel Træning</span>
         </label>
 
         <!-- 2 days -->
-        <input type="radio" class="btn-check" name="days" id="2day" autocomplete="off" value="2">
+        <input type="radio" class="btn-check" name="days" id="2day" autocomplete="off" value="2" required>
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="2day">
             <img src="images/icons/calendar/calendar-2.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-4 montserrat fw-bold text-start">2 dage om ugen</span>
         </label>
 
         <!-- 3 days -->
-        <input type="radio" class="btn-check" name="days" id="3day" autocomplete="off" value="3">
+        <input type="radio" class="btn-check" name="days" id="3day" autocomplete="off" value="3" required>
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="3day">
             <img src="images/icons/calendar/calendar-3.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-4 montserrat fw-bold text-start">3 dage om ugen</span>
         </label>
 
         <!-- 4 days -->
-        <input type="radio" class="btn-check" name="days" id="4day" autocomplete="off" value="4">
+        <input type="radio" class="btn-check" name="days" id="4day" autocomplete="off" value="4" required>
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="4day">
             <img src="images/icons/calendar/calendar-4.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-4 montserrat fw-bold text-start">4 dage om ugen</span>
         </label>
 
         <!-- 5 days -->
-        <input type="radio" class="btn-check" name="days" id="5day" autocomplete="off" value="5">
+        <input type="radio" class="btn-check" name="days" id="5day" autocomplete="off" value="5" required>
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="5day">
             <img src="images/icons/calendar/calendar-5.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-4 montserrat fw-bold text-start">5 dage om ugen</span>
         </label>
 
         <!-- 6 days -->
-        <input type="radio" class="btn-check" name="days" id="6day" autocomplete="off" value="6">
+        <input type="radio" class="btn-check" name="days" id="6day" autocomplete="off" value="6" required>
         <label class="btn p-4 d-flex bg-white rounded-4 align-items-center gap-4 w-100 mt-3" for="6day">
             <img src="images/icons/calendar/calendar-6.svg" alt="calendarIkon" class="img-fluid">
             <span class="fs-4 montserrat fw-bold text-start">6 dage om ugen</span>
@@ -616,7 +616,7 @@ if ($_POST) {
 <!-- Bottom Nav -->
 <footer class="mt-auto rounded-top-circle bg-white position-sticky bottom-0" style="min-height: 85px;">
     <div class="d-flex justify-content-around" style="margin-top: -25px; margin-bottom: 25px;">
-        <!-- Button Back -->
+        <!-- Button Back Home -->
         <div class="flex-column-center gap-1" id="btnFirstHome">
             <a class="p-3 bg-info rounded-circle" href="index.php">
                 <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 45 45" fill="none">
@@ -628,7 +628,7 @@ if ($_POST) {
             <p class="text-center montserrat fw-bold m-0">Annuller</p>
         </div>
 
-        <!-- Button Back 2 -->
+        <!-- Button Back Step -->
         <div class="flex-column-center gap-1 d-none" id="btnBackDiv">
             <button type="button" class="p-3 bg-secondary rounded-circle border-0" href="index.php" id="btnBack">
                 <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 45 45" fill="none">
@@ -650,7 +650,7 @@ if ($_POST) {
             <p class="text-center montserrat fw-bold m-0">Annuller</p>
         </div>
 
-        <!-- Button Next -->
+        <!-- Button Next Step -->
         <div class="flex-column-center gap-1" id="btnNextDiv">
             <button type="button" class="p-3 bg-primary rounded-circle border-0" id="btnNext">
                 <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 45 45" fill="none">
@@ -662,9 +662,9 @@ if ($_POST) {
             <p class="text-center montserrat fw-bold m-0">Næste</p>
         </div>
 
-        <!-- Button Next 2 -->
-        <div class="flex-column-center gap-1 d-none" id="btnNext2">
-            <button type="submit" form="workoutForm" class="p-3 bg-info rounded-circle border-0" id="btnNext2">
+        <!-- Button Submit -->
+        <div class="flex-column-center gap-1 d-none" id="btnSubmit">
+            <button type="submit" form="workoutForm" class="p-3 bg-info rounded-circle border-0">
                 <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 45 45" fill="none">
                     <path fill-rule="evenodd" clip-rule="evenodd" d="M38.9635 10.2542C39.0944 10.3848 39.1983 10.54 39.2692 10.7109C39.3401 10.8817 39.3766 11.0649 39.3766 11.2498C39.3766 11.4348 39.3401 11.618 39.2692 11.7888C39.1983 11.9596 39.0944 12.1148 38.9635 12.2455L19.276 31.933C19.1453 32.0639 18.9902 32.1678 18.8193 32.2387C18.6485 32.3096 18.4653 32.3461 18.2803 32.3461C18.0954 32.3461 17.9122 32.3096 17.7414 32.2387C17.5705 32.1678 17.4153 32.0639 17.2847 31.933L7.44097 22.0892C7.17691 21.8251 7.02856 21.467 7.02856 21.0936C7.02856 20.7201 7.17691 20.362 7.44097 20.098C7.70502 19.8339 8.06316 19.6856 8.43659 19.6856C8.81002 19.6856 9.16816 19.8339 9.43222 20.098L18.2803 28.9489L36.9722 10.2542C37.1028 10.1232 37.258 10.0193 37.4289 9.94845C37.5997 9.87756 37.7829 9.84106 37.9678 9.84106C38.1528 9.84106 38.336 9.87756 38.5068 9.94845C38.6777 10.0193 38.8328 10.1232 38.9635 10.2542V10.2542Z" fill="white"/>
                 </svg>
@@ -674,7 +674,7 @@ if ($_POST) {
     </div>
 </footer>
 
-<script src="scripts/generate.js"></script>
+<script src="scripts/generateBtns.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

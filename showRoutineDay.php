@@ -20,14 +20,18 @@ if (!$workoutId) {
     exit("Missing workout_id");
 }
 
-/* Get workout info */
+//1. GET WORKOUT (SECURED TO USER OWNERSHIP)
+
 $workout = $db->sql("
-    SELECT id, workout_number, name, program_id
-    FROM workouts
-    WHERE id = :id
+    SELECT w.id, w.workout_number, w.name, w.program_id
+    FROM workouts w
+    INNER JOIN training_programs p ON p.id = w.program_id
+    WHERE w.id = :id
+      AND p.member_id = :user_id
     LIMIT 1
 ", [
-    ":id" => $workoutId
+    ":id" => $workoutId,
+    ":user_id" => $userId
 ]);
 
 if (!$workout) {
@@ -35,23 +39,30 @@ if (!$workout) {
 }
 
 $workout = $workout[0];
+$programId = $workout->program_id;
 
-/* Get exercises for THIS workout only */
+// 2. GET EXERCISES FOR THIS WORKOUT
+
 $exercises = $db->sql("
     SELECT 
+        e.id,
         e.name,
         e.description,
         we.exercise_order,
         we.sets,
         we.reps,
-        we.rest_seconds
+        we.rest_seconds,
+        e.difficulty_id,
+        e.goal_id
     FROM workout_exercises we
-    INNER JOIN exercises e ON we.exercise_id = e.id
+    INNER JOIN exercises e ON e.id = we.exercise_id
     WHERE we.workout_id = :workout_id
     ORDER BY we.exercise_order ASC
 ", [
     ":workout_id" => $workoutId
 ]);
+
+//3. NAVIGATION (PREV / NEXT / LOOP)
 
 $nav = $db->sql("
     SELECT
@@ -65,8 +76,8 @@ $nav = $db->sql("
         bounds.last_id
 
     FROM workouts w
+    INNER JOIN training_programs p ON p.id = w.program_id
 
-    /* previous workout */
     LEFT JOIN workouts prev
         ON prev.program_id = w.program_id
        AND prev.workout_number = (
@@ -76,7 +87,6 @@ $nav = $db->sql("
               AND workout_number < w.workout_number
        )
 
-    /* next workout */
     LEFT JOIN workouts next
         ON next.program_id = w.program_id
        AND next.workout_number = (
@@ -86,7 +96,6 @@ $nav = $db->sql("
               AND workout_number > w.workout_number
        )
 
-    /* bounds for looping */
     JOIN (
         SELECT
             program_id,
@@ -95,12 +104,14 @@ $nav = $db->sql("
         FROM workouts
         GROUP BY program_id
     ) bounds
-    ON bounds.program_id = w.program_id
+      ON bounds.program_id = w.program_id
 
     WHERE w.id = :id
+      AND p.member_id = :user_id
     LIMIT 1
 ", [
-    ":id" => $workoutId
+    ":id" => $workoutId,
+    ":user_id" => $userId
 ]);
 
 if (!$nav) {
@@ -111,7 +122,21 @@ $nav = $nav[0];
 
 $prevId = $nav->prev_id ?? $nav->last_id;
 $nextId = $nav->next_id ?? $nav->first_id;
+
+// 4. TOTAL WORKOUT COUNT (FOR THIS USER)
+
+$total_workouts = $db->sql("
+    SELECT COUNT(*) AS total_workouts
+    FROM workouts w
+    INNER JOIN training_programs p ON p.id = w.program_id
+    WHERE p.member_id = :user_id
+", [
+    ":user_id" => $userId
+]);
+
+$total_workouts = $total_workouts[0]->total_workouts;
 ?>
+
 <!DOCTYPE html>
 <html lang="da">
 <head>
@@ -141,18 +166,23 @@ $nextId = $nav->next_id ?? $nav->first_id;
 </nav>
 
 <h1 class="montserrat fw-bold my-5 mb-4 ms-3">
-    Day <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
+    Dag <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name) ?>
 </h1>
+
+<!-- Indicators -->
+<div class="container">
+    <div class="row">
+        <?php for ($i = 1; $i <= $total_workouts; $i++): ?>
+            <div style="height: 5px; margin-left: 6px; margin-right: 6px;" class="showRoutineDayIndicator rounded-4 col <?= ($i == $workout->workout_number) ? 'bg-primary' : 'bg-white' ?>"></div>
+        <?php endfor; ?>
+    </div>
+    <p class="mt-2">Dag <?= (int)$workout->workout_number ?> ud af <?= $total_workouts ?></p>
+</div>
+
 
 <div class="container p-0">
 
     <div class="row bg-white rounded-4 p-3 mx-0 mb-5">
-    <!--    <div class="d-flex justify-content-between">-->
-    <!--        <h2 class="montserrat fw-bold text-dark">-->
-    <!--            Exercises-->
-    <!--        </h2>-->
-    <!--    </div>-->
-
         <?php if (empty($exercises)): ?>
             <p>No exercises found.</p>
         <?php else: ?>
@@ -161,27 +191,18 @@ $nextId = $nav->next_id ?? $nav->first_id;
                 <table class="table align-middle">
                     <thead>
                     <tr>
-    <!--                    <th>#</th>-->
-                        <th>Exercise</th>
-                        <th>Description</th>
+                        <th>Øvelse & Beskrivelse</th>
                         <th class="p-0">Sets & Reps</th>
-    <!--                    <th>Reps</th>-->
-    <!--                    <th>Rest</th>-->
                     </tr>
                     </thead>
                     <tbody>
                     <?php foreach ($exercises as $index => $ex): ?>
                         <tr>
-    <!--                        <td>--><?php //= $index + 1 ?><!--</td>-->
-                            <td>
-                                <strong><?= htmlspecialchars($ex->name) ?></strong>
-                            </td>
-                            <td>
+                            <td class="flex-column">
+                                <strong class="fs-5"><?= htmlspecialchars($ex->name) ?></strong>
                                 <?= htmlspecialchars($ex->description) ?>
                             </td>
-                            <td><?= (int)$ex->sets . "X" . (int)$ex->reps ?></td>
-                            <!-- <td>--><?php //= (int)$ex->reps ?><!--</td>-->
-                            <!-- <td>--><?php //= (int)$ex->rest_seconds ?><!--s</td>-->
+                            <td><?= (int)$ex->sets . " x " . (int)$ex->reps ?></td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>

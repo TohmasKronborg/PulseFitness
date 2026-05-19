@@ -126,7 +126,7 @@ $totalWorkouts = $totalWorkouts[0]->total;
                             <!-- <th>Beskrivelse</th> -->
                             <th>Sets</th>
                             <th>Reps</th>
-                            <th>Rest</th>
+                            <th>Hviletid</th>
                         </tr>
                         </thead>
                         <tbody>
