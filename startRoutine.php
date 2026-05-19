@@ -14,6 +14,78 @@ if (empty($_SESSION['userId'])) {
 
 $userId = $_SESSION['userId'];
 
+$workoutId = $_GET['workout_id'] ?? null;
+
+if (!$workoutId) {
+    exit("Missing workout_id");
+}
+
+//1. Get workout
+$workout = $db->sql("
+    SELECT w.id, w.workout_number, w.name, w.program_id
+    FROM workouts w
+    INNER JOIN training_programs p ON p.id = w.program_id
+    WHERE w.id = :id
+      AND p.member_id = :user_id
+    LIMIT 1
+", [
+    ":id" => $workoutId,
+    ":user_id" => $userId
+]);
+
+if (!$workout) {
+    exit("Workout not found");
+}
+
+$workout = $workout[0];
+$programId = $workout->program_id;
+
+
+// 2. Get exercises for this workout
+$exercises = $db->sql("
+    SELECT 
+        e.id,
+        e.name,
+        e.description,
+        we.exercise_order,
+        we.sets,
+        we.reps,
+        we.rest_seconds,
+        e.difficulty_id,
+        e.goal_id,
+        mg.name AS muscle_group_name
+    FROM workout_exercises we
+
+    INNER JOIN exercises e 
+        ON e.id = we.exercise_id
+
+    LEFT JOIN exercise_muscle_groups emg
+        ON emg.exercise_id = e.id
+
+    LEFT JOIN muscle_groups mg
+        ON mg.id = emg.muscle_group_id
+
+    WHERE we.workout_id = :workout_id
+
+    ORDER BY we.exercise_order ASC
+", [
+    ":workout_id" => $workoutId
+]);
+
+
+// 3. Total amount of workouts
+$total_workouts = $db->sql("
+    SELECT COUNT(*) AS total_workouts
+    FROM workouts w
+    INNER JOIN training_programs p ON p.id = w.program_id
+    WHERE p.member_id = :user_id
+", [
+    ":user_id" => $userId
+]);
+
+function formatTimeMMSS($seconds) {
+    return sprintf('%02d:%02d', floor($seconds / 60), $seconds % 60);
+}
 ?>
 
 <!DOCTYPE html>
@@ -44,7 +116,197 @@ $userId = $_SESSION['userId'];
     <img src="images/VectorPrimary.svg" alt="dims">
 </nav>
 
+<div class="mx-2 my-4">
+    <h1 class="montserrat fw-bold">
+        Dag <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name, ENT_QUOTES, 'UTF-8') ?>
+    </h1>
+    <p class="text-gray"><?= 3 ?> / <?= $total_workouts ?> Øvelser Fuldført</p>
+</div>
 
+<!-- Tasks Container -->
+<div class="container-fluid mb-5">
+    <!-- Default -->
+    <div class="row bg-white rounded-4 p-3 m-0 justify-content-between mb-4">
+        <div class="col-12 p-0">
+            <h2 class="fs-4 m-0"><b class="montserrat"><?= $exercises[0]->name ?></b> — <?= $exercises[0]->muscle_group_name?></h2>
+            <p class="m-0"><?= $exercises[0]->sets ?> set af <?= $exercises[0]->reps ?></p>
+        </div>
+
+        <hr class="my-2">
+
+        <!-- Set indicators -->
+        <div class="col-11 p-0 pe-3">
+            <!-- Active -->
+            <div class="row p-0 m-0">
+                <div class="montserrat p-0 bg-secondary text-white p-2 rounded-3 d-flex mb-3 col-11">
+                    <p class="m-0 me-5">Set 1</p>
+                    <p class="m-0"><b><?= $exercises[0]->reps ?></b> Reps</p>
+                </div>
+                <!-- Arrow -->
+                <div class="col-1 d-flex justify-content-center pt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <g clip-path="url(#clip0_135_951)">
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M23.999 12.0002C23.999 12.4169 23.841 12.8166 23.5597 13.1112C23.2785 13.4059 22.897 13.5714 22.4992 13.5714H5.12213L11.5624 20.3147C11.7019 20.4608 11.8125 20.6342 11.8879 20.8251C11.9634 21.016 12.0023 21.2205 12.0023 21.4271C12.0023 21.6337 11.9634 21.8383 11.8879 22.0291C11.8125 22.22 11.7019 22.3934 11.5624 22.5395C11.423 22.6856 11.2574 22.8014 11.0752 22.8805C10.893 22.9596 10.6977 23.0002 10.5005 23.0002C10.3033 23.0002 10.108 22.9596 9.92585 22.8805C9.74365 22.8014 9.5781 22.6856 9.43865 22.5395L0.439655 13.1126C0.299981 12.9667 0.189165 12.7933 0.113554 12.6024C0.0379429 12.4115 -0.000976563 12.2069 -0.000976562 12.0002C-0.000976563 11.7936 0.0379429 11.589 0.113554 11.3981C0.189165 11.2072 0.299981 11.0338 0.439655 10.8879L9.43865 1.461C9.72028 1.16598 10.1022 1.00024 10.5005 1.00024C10.8988 1.00024 11.2808 1.16598 11.5624 1.461C11.844 1.75602 12.0023 2.15615 12.0023 2.57337C12.0023 2.99059 11.844 3.39073 11.5624 3.68575L5.12213 10.4291H22.4992C22.897 10.4291 23.2785 10.5946 23.5597 10.8893C23.841 11.1839 23.999 11.5836 23.999 12.0002Z" fill="#525FDD"/>
+                        </g>
+                        <defs>
+                            <clipPath id="clip0_135_951">
+                                <rect width="24" height="24" fill="white"/>
+                            </clipPath>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Inactive -->
+            <div class="col-11">
+                <div class="montserrat p-0 bg-light text-dark p-2 rounded-3 d-flex mb-3">
+                    <p class="m-0 me-5">Set 2</p>
+                    <p class="m-0"><b><?= $exercises[0]->reps ?></b> Reps</p>
+                </div>
+            </div>
+
+            <!-- Inactive -->
+            <div class="col-11">
+                <div class="montserrat p-0 bg-light text-dark p-2 rounded-3 d-flex">
+                    <p class="m-0 me-5">Set 3</p>
+                    <p class="m-0"><b><?= $exercises[0]->reps ?></b> Reps</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Check -->
+        <div class="col-1 flex-center bg-primary rounded-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                      d="M20.7805 5.46888C20.8503 5.53854 20.9057 5.62131 20.9436 5.71243C20.9814 5.80354 21.0008 5.90123 21.0008 5.99988C21.0008 6.09853 20.9814 6.19621 20.9436 6.28733C20.9057 6.37844 20.8503 6.46121 20.7805 6.53088L10.2805 17.0309C10.2108 17.1007 10.1281 17.1561 10.0369 17.1939C9.94582 17.2318 9.84813 17.2512 9.74948 17.2512C9.65083 17.2512 9.55315 17.2318 9.46203 17.1939C9.37091 17.1561 9.28815 17.1007 9.21848 17.0309L3.96848 11.7809C3.82765 11.64 3.74854 11.449 3.74854 11.2499C3.74854 11.0507 3.82765 10.8597 3.96848 10.7189C4.10931 10.578 4.30032 10.4989 4.49948 10.4989C4.69865 10.4989 4.88965 10.578 5.03048 10.7189L9.74948 15.4394L19.7185 5.46888C19.7882 5.39903 19.8709 5.34362 19.962 5.30581C20.0532 5.268 20.1508 5.24854 20.2495 5.24854C20.3481 5.24854 20.4458 5.268 20.5369 5.30581C20.628 5.34362 20.7108 5.39903 20.7805 5.46888Z"
+                      fill="white"/>
+            </svg>
+        </div>
+
+    </div>
+
+    <!-- Waiting -->
+    <div class="row bg-white rounded-4 p-3 m-0 justify-content-between mb-4">
+        <div class="col-12 p-0">
+            <h2 class="fs-4 m-0"><b class="montserrat"><?= $exercises[2]->name ?></b> — <?= $exercises[2]->muscle_group_name?></h2>
+            <p class="m-0"><?= $exercises[2]->sets ?> set af <?= $exercises[2]->reps ?></p>
+        </div>
+
+        <hr class="my-2">
+
+        <!-- Set indicators -->
+        <div class="col-11 p-0 pe-3">
+            <!-- Done -->
+            <div class="col-12 p-0">
+                <div class="montserrat p-0 bg-light text-gray p-2 rounded-3 d-flex mb-3">
+                    <p class="m-0 me-5"><s>Set 2</s></p>
+                    <p class="m-0"><s><b><?= $exercises[3]->reps ?></b> Reps</s></p>
+                </div>
+            </div>
+
+            <!-- Waiting -->
+            <div class="row p-0 m-0">
+                <div class="montserrat p-0 bg-secondary text-white p-2 rounded-3 d-flex mb-3 col-11">
+                    <p class="m-0 me-5">Set 1</p>
+                    <p class="m-0">Hvil - <b><?php echo formatTimeMMSS($exercises[2]->rest_seconds); ?></b></p>
+                </div>
+                <!-- Glock -->
+                <div class="col-1 d-flex justify-content-center pt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <g clip-path="url(#clip0_135_1019)">
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 22.5C14.7848 22.5 17.4555 21.3938 19.4246 19.4246C21.3938 17.4555 22.5 14.7848 22.5 12C22.5 9.21523 21.3938 6.54451 19.4246 4.57538C17.4555 2.60625 14.7848 1.5 12 1.5C9.21523 1.5 6.54451 2.60625 4.57538 4.57538C2.60625 6.54451 1.5 9.21523 1.5 12C1.5 14.7848 2.60625 17.4555 4.57538 19.4246C6.54451 21.3938 9.21523 22.5 12 22.5ZM24 12C24 15.1826 22.7357 18.2348 20.4853 20.4853C18.2348 22.7357 15.1826 24 12 24C8.8174 24 5.76516 22.7357 3.51472 20.4853C1.26428 18.2348 0 15.1826 0 12C0 8.8174 1.26428 5.76516 3.51472 3.51472C5.76516 1.26428 8.8174 0 12 0C15.1826 0 18.2348 1.26428 20.4853 3.51472C22.7357 5.76516 24 8.8174 24 12Z" fill="#525FDD"/>
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M11.25 4.5C11.4489 4.5 11.6397 4.57902 11.7803 4.71967C11.921 4.86032 12 5.05109 12 5.25V13.065L16.872 15.849C17.0397 15.9502 17.1612 16.1129 17.2104 16.3024C17.2597 16.492 17.2329 16.6933 17.1358 16.8633C17.0386 17.0333 16.8788 17.1586 16.6905 17.2124C16.5022 17.2661 16.3003 17.2441 16.128 17.151L10.878 14.151C10.7632 14.0854 10.6678 13.9907 10.6014 13.8764C10.535 13.762 10.5 13.6322 10.5 13.5V5.25C10.5 5.05109 10.579 4.86032 10.7197 4.71967C10.8603 4.57902 11.0511 4.5 11.25 4.5Z" fill="#525FDD"/>
+                        </g>
+                        <defs>
+                            <clipPath id="clip0_135_1019">
+                                <rect width="24" height="24" fill="white"/>
+                            </clipPath>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Inactive -->
+            <div class="col-11">
+                <div class="montserrat p-0 bg-light text-dark p-2 rounded-3 d-flex mb-3">
+                    <p class="m-0 me-5">Set 2</p>
+                    <p class="m-0"><b><?= $exercises[2]->reps ?></b> Reps</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Check -->
+        <div class="col-1 flex-center bg-primary rounded-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                      d="M20.7805 5.46888C20.8503 5.53854 20.9057 5.62131 20.9436 5.71243C20.9814 5.80354 21.0008 5.90123 21.0008 5.99988C21.0008 6.09853 20.9814 6.19621 20.9436 6.28733C20.9057 6.37844 20.8503 6.46121 20.7805 6.53088L10.2805 17.0309C10.2108 17.1007 10.1281 17.1561 10.0369 17.1939C9.94582 17.2318 9.84813 17.2512 9.74948 17.2512C9.65083 17.2512 9.55315 17.2318 9.46203 17.1939C9.37091 17.1561 9.28815 17.1007 9.21848 17.0309L3.96848 11.7809C3.82765 11.64 3.74854 11.449 3.74854 11.2499C3.74854 11.0507 3.82765 10.8597 3.96848 10.7189C4.10931 10.578 4.30032 10.4989 4.49948 10.4989C4.69865 10.4989 4.88965 10.578 5.03048 10.7189L9.74948 15.4394L19.7185 5.46888C19.7882 5.39903 19.8709 5.34362 19.962 5.30581C20.0532 5.268 20.1508 5.24854 20.2495 5.24854C20.3481 5.24854 20.4458 5.268 20.5369 5.30581C20.628 5.34362 20.7108 5.39903 20.7805 5.46888Z"
+                      fill="white"/>
+            </svg>
+        </div>
+
+    </div>
+
+    <!-- Nearly done -->
+    <div class="row bg-white rounded-4 p-3 m-0 justify-content-between">
+        <div class="col-12 p-0">
+            <h2 class="fs-4 m-0"><b class="montserrat"><?= $exercises[3]->name ?></b> — <?= $exercises[3]->muscle_group_name?></h2>
+            <p class="m-0"><?= $exercises[3]->sets ?> set af <?= $exercises[3]->reps ?></p>
+        </div>
+
+        <hr class="my-2">
+
+        <!-- Set indicators -->
+        <div class="col-11 p-0 pe-3">
+            <!-- Done -->
+            <div class="col-12 p-0">
+                <div class="montserrat p-0 bg-light text-gray p-2 rounded-3 d-flex mb-3">
+                    <p class="m-0 me-5"><s>Set 2</s></p>
+                    <p class="m-0"><s><b><?= $exercises[3]->reps ?></b> Reps</s></p>
+                </div>
+            </div>
+
+            <!-- Done -->
+            <div class="col-12 p-0">
+                <div class="montserrat p-0 bg-light text-gray p-2 rounded-3 d-flex mb-3">
+                    <p class="m-0 me-5"><s>Set 2</s></p>
+                    <p class="m-0"><s><b><?= $exercises[3]->reps ?></b> Reps</s></p>
+                </div>
+            </div>
+
+            <!-- Active -->
+            <div class="row p-0 m-0">
+                <div class="montserrat p-0 bg-secondary text-white p-2 rounded-3 d-flex mb-3 col-11">
+                    <p class="m-0 me-5">Set 1</p>
+                    <p class="m-0"><b><?= $exercises[3]->reps ?></b> Reps</p>
+                </div>
+                <!-- Arrow -->
+                <div class="col-1 d-flex justify-content-center pt-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <g clip-path="url(#clip0_135_951)">
+                            <path fill-rule="evenodd" clip-rule="evenodd" d="M23.999 12.0002C23.999 12.4169 23.841 12.8166 23.5597 13.1112C23.2785 13.4059 22.897 13.5714 22.4992 13.5714H5.12213L11.5624 20.3147C11.7019 20.4608 11.8125 20.6342 11.8879 20.8251C11.9634 21.016 12.0023 21.2205 12.0023 21.4271C12.0023 21.6337 11.9634 21.8383 11.8879 22.0291C11.8125 22.22 11.7019 22.3934 11.5624 22.5395C11.423 22.6856 11.2574 22.8014 11.0752 22.8805C10.893 22.9596 10.6977 23.0002 10.5005 23.0002C10.3033 23.0002 10.108 22.9596 9.92585 22.8805C9.74365 22.8014 9.5781 22.6856 9.43865 22.5395L0.439655 13.1126C0.299981 12.9667 0.189165 12.7933 0.113554 12.6024C0.0379429 12.4115 -0.000976563 12.2069 -0.000976562 12.0002C-0.000976563 11.7936 0.0379429 11.589 0.113554 11.3981C0.189165 11.2072 0.299981 11.0338 0.439655 10.8879L9.43865 1.461C9.72028 1.16598 10.1022 1.00024 10.5005 1.00024C10.8988 1.00024 11.2808 1.16598 11.5624 1.461C11.844 1.75602 12.0023 2.15615 12.0023 2.57337C12.0023 2.99059 11.844 3.39073 11.5624 3.68575L5.12213 10.4291H22.4992C22.897 10.4291 23.2785 10.5946 23.5597 10.8893C23.841 11.1839 23.999 11.5836 23.999 12.0002Z" fill="#525FDD"/>
+                        </g>
+                        <defs>
+                            <clipPath id="clip0_135_951">
+                                <rect width="24" height="24" fill="white"/>
+                            </clipPath>
+                        </defs>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- Check -->
+        <div class="col-1 flex-center bg-primary rounded-3">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path fill-rule="evenodd" clip-rule="evenodd"
+                      d="M20.7805 5.46888C20.8503 5.53854 20.9057 5.62131 20.9436 5.71243C20.9814 5.80354 21.0008 5.90123 21.0008 5.99988C21.0008 6.09853 20.9814 6.19621 20.9436 6.28733C20.9057 6.37844 20.8503 6.46121 20.7805 6.53088L10.2805 17.0309C10.2108 17.1007 10.1281 17.1561 10.0369 17.1939C9.94582 17.2318 9.84813 17.2512 9.74948 17.2512C9.65083 17.2512 9.55315 17.2318 9.46203 17.1939C9.37091 17.1561 9.28815 17.1007 9.21848 17.0309L3.96848 11.7809C3.82765 11.64 3.74854 11.449 3.74854 11.2499C3.74854 11.0507 3.82765 10.8597 3.96848 10.7189C4.10931 10.578 4.30032 10.4989 4.49948 10.4989C4.69865 10.4989 4.88965 10.578 5.03048 10.7189L9.74948 15.4394L19.7185 5.46888C19.7882 5.39903 19.8709 5.34362 19.962 5.30581C20.0532 5.268 20.1508 5.24854 20.2495 5.24854C20.3481 5.24854 20.4458 5.268 20.5369 5.30581C20.628 5.34362 20.7108 5.39903 20.7805 5.46888Z"
+                      fill="white"/>
+            </svg>
+        </div>
+
+    </div>
+
+</div>
 
 <!-- Bottom Nav -->
 <footer class="mt-auto rounded-top-circle bg-white position-sticky bottom-0" style="min-height: 85px;">
