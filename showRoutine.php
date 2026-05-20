@@ -183,7 +183,7 @@ $totalWorkouts = $totalWorkouts[0]->total;
             <p class="text-center montserrat fw-bold m-0 text-nowrap">Start Rutine</p>
         </div>
 
-        <!-- Add Button -->
+        <!-- Home button -->
         <div class="flex-column-center gap-1" >
             <a class="p-3 bg-secondary rounded-circle" href="index.php">
                 <svg xmlns="http://www.w3.org/2000/svg" width="35" height=35" viewBox="0 0 45 45" fill="none">

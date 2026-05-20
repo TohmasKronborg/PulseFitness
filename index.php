@@ -74,15 +74,29 @@ $workouts = $db->sql("
         w.id,
         w.name,
         w.workout_number,
+        w.completed_at,
+
         COUNT(we.exercise_id) AS total_exercises,
-        SUM(we.rest_seconds) AS total_rest_seconds
+
+        COALESCE(SUM(we.rest_seconds), 0) AS total_rest_seconds
+
     FROM workouts w
+
     INNER JOIN training_programs tp 
         ON tp.id = w.program_id
+
     LEFT JOIN workout_exercises we 
         ON we.workout_id = w.id
+
     WHERE tp.member_id = :member_id
-    GROUP BY w.id, w.name, w.workout_number
+      AND w.completed_at IS NULL
+
+    GROUP BY 
+        w.id,
+        w.name,
+        w.workout_number,
+        w.completed_at
+
     ORDER BY w.workout_number ASC
 ", [
     ":member_id" => $userId
@@ -103,6 +117,8 @@ $workouts = $db->sql("
 
             return [$hours, $minutes];
         }
+
+        $rest = [];
 
         if (!empty($workouts)) {
 
@@ -300,9 +316,13 @@ $workouts = $db->sql("
 </footer>
 
 <script>
-    const noRoutine = document.querySelector("#noRoutine")
+    const noRoutine = document.querySelector("#noRoutine");
 
-    noRoutine.addEventListener("click", function(){ alert("Du har endnu ikke generet nogen rutine"); })
+    if (noRoutine) {
+        noRoutine.addEventListener("click", function () {
+            alert("Du har endnu ikke generet nogen rutine");
+        });
+    }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
