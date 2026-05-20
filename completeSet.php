@@ -86,21 +86,14 @@ if ($next) {
 
     $next = $next[0];
 
+    // make next set resting instead of active
     $db->sql("
         UPDATE user_workout_progress
-        SET status = 'active'
+        SET status = 'resting'
         WHERE id = :id
     ", [
         ":id" => $next->id
     ]);
-
-} else {
-
-    /*
-    | No more sets → exercise is complete
-    | (optional: mark exercise done in another table)
-    */
-
 }
 
 echo json_encode([

@@ -326,7 +326,13 @@ function formatTimeMMSS($seconds): string
                             </p>
                             <p class="m-0">
                                 <?php if ($status === "resting"): ?>
-                                    Hvil - <b class="rest-timer" data-rest="<?= $exercise["rest_seconds"] ?>"><?= formatTimeMMSS($exercise["rest_seconds"]) ?></b>
+                                    Hvil - <b
+                                            class="rest-timer"
+                                            data-progress-id="<?= $set["progress_id"] ?>"
+                                            data-seconds="<?= $exercise["rest_seconds"] ?>"
+                                    >
+                                        <?= formatTimeMMSS($exercise["rest_seconds"]) ?>
+                                    </b>
                                 <?php else: ?>
                                     <?php if ($status === "completed"): ?>
                                         <s><b><?= $exercise["reps"] ?></b> Reps</s>
@@ -387,7 +393,6 @@ function formatTimeMMSS($seconds): string
 
             <!-- Complete Set Button -->
                 <?php if ($hasActiveSet): ?>
-
                     <button type="button" class="btn btn-primary col-2 flex-center rounded-3 p-0 complete-set-btn" data-workout-exercise-id="<?= $exercise["workout_exercise_id"] ?>">
                         <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
                             <path fill-rule="evenodd" clip-rule="evenodd"
@@ -395,7 +400,24 @@ function formatTimeMMSS($seconds): string
                                   fill="white"/>
                         </svg>
                     </button>
-
+<!--                --><?php //else: ?>
+<!--                    <button type="button" class="btn btn-grays col-2 flex-center rounded-3 py-2 complete-set-btn" data-workout-exercise-id="--><?php //= $exercise["workout_exercise_id"] ?><!--">-->
+<!--                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">-->
+<!--                            <g clip-path="url(#clip0_135_1019)">-->
+<!--                                <path fill-rule="evenodd" clip-rule="evenodd"-->
+<!--                                      d="M12 22.5C14.7848 22.5 17.4555 21.3938 19.4246 19.4246C21.3938 17.4555 22.5 14.7848 22.5 12C22.5 9.21523 21.3938 6.54451 19.4246 4.57538C17.4555 2.60625 14.7848 1.5 12 1.5C9.21523 1.5 6.54451 2.60625 4.57538 4.57538C2.60625 6.54451 1.5 9.21523 1.5 12C1.5 14.7848 2.60625 17.4555 4.57538 19.4246C6.54451 21.3938 9.21523 22.5 12 22.5ZM24 12C24 15.1826 22.7357 18.2348 20.4853 20.4853C18.2348 22.7357 15.1826 24 12 24C8.8174 24 5.76516 22.7357 3.51472 20.4853C1.26428 18.2348 0 15.1826 0 12C0 8.8174 1.26428 5.76516 3.51472 3.51472C5.76516 1.26428 8.8174 0 12 0C15.1826 0 18.2348 1.26428 20.4853 3.51472C22.7357 5.76516 24 8.8174 24 12Z"-->
+<!--                                      fill="white"/>-->
+<!--                                <path fill-rule="evenodd" clip-rule="evenodd"-->
+<!--                                      d="M11.25 4.5C11.4489 4.5 11.6397 4.57902 11.7803 4.71967C11.921 4.86032 12 5.05109 12 5.25V13.065L16.872 15.849C17.0397 15.9502 17.1612 16.1129 17.2104 16.3024C17.2597 16.492 17.2329 16.6933 17.1358 16.8633C17.0386 17.0333 16.8788 17.1586 16.6905 17.2124C16.5022 17.2661 16.3003 17.2441 16.128 17.151L10.878 14.151C10.7632 14.0854 10.6678 13.9907 10.6014 13.8764C10.535 13.762 10.5 13.6322 10.5 13.5V5.25C10.5 5.05109 10.579 4.86032 10.7197 4.71967C10.8603 4.57902 11.0511 4.5 11.25 4.5Z"-->
+<!--                                      fill="white"/>-->
+<!--                            </g>-->
+<!--                            <defs>-->
+<!--                                <clipPath id="clip0_135_1019">-->
+<!--                                    <rect width="24" height="24" fill="white"/>-->
+<!--                                </clipPath>-->
+<!--                            </defs>-->
+<!--                        </svg>-->
+<!--                    </button>-->
                 <?php endif; ?>
 
         </div>
@@ -471,26 +493,55 @@ function formatTimeMMSS($seconds): string
     });
 
     // Timer (don't work)
-    let timers = {};
+    let timers = new Map();
 
-    function startTimer(id, seconds) {
-        if (timers[id]) clearInterval(timers[id]);
+    function formatTime(t) {
+        const m = Math.floor(t / 60);
+        const s = t % 60;
+        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }
+
+    function startRestTimer(el) {
+        const progressId = el.dataset.progressId;
+        const seconds = parseInt(el.dataset.seconds);
+
+        // prevent double-binding same element
+        if (timers.has(progressId)) {
+            clearInterval(timers.get(progressId));
+        }
 
         let t = seconds;
 
-        timers[id] = setInterval(() => {
-            const el = document.querySelector('[data-timer="'+id+'"]').parentElement;
+        const interval = setInterval(() => {
+
+            el.textContent = formatTime(t);
 
             if (t <= 0) {
-                clearInterval(timers[id]);
-                location.reload();
+                clearInterval(interval);
+                timers.delete(progressId);
+
+                fetch('finishRest.php', {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                    body: 'progress_id=' + progressId
+                }).then(() => location.reload());
+
+                return;
             }
 
-            if (el) el.innerHTML = "Rest: " + t + "s";
-
             t--;
+
         }, 1000);
+
+        timers.set(progressId, interval);
     }
+
+    window.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('.rest-timer').forEach(el => {
+            startRestTimer(el);
+        });
+    });
+
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
