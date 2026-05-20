@@ -278,13 +278,14 @@ function formatTimeMMSS($seconds): string
             <!-- Exercise Header -->
             <div class="col-12 p-0">
                 <h2 class="fs-4 m-0"><b class="montserrat"><?= htmlspecialchars($exercise["name"]) ?></b> — <?= htmlspecialchars($exercise["muscle_groups"]) ?></h2>
-                <p class="m-0"><?= $exercise["sets"] ?> set af <?= $exercise["reps"] ?></p>
+                <p class="m-0 text-gray"><?= $exercise["description"] ?></p>
+                <p class="m-0 text-gray"><?= $exercise["sets"] ?> set af <?= $exercise["reps"] ?> reps</p>
             </div>
 
             <hr class="my-2">
 
             <!-- Sets Indicators -->
-            <div class="col-10 p-0 pe-3">
+            <div class="<?= !empty($hasActiveSet) ? "col-10" : "col-12" ?> p-0 pe-3">
                 <?php foreach ($exercise["set_data"] as $set): ?>
 
                     <?php
@@ -331,7 +332,7 @@ function formatTimeMMSS($seconds): string
                         </div>
 
                         <!-- Icon -->
-                        <div class="col-1 d-flex justify-content-center pt-2 p-0">
+                        <div class="col-1 col-sm-2 flex-center p-0">
                             <!-- Arrow -->
                             <?php if ($status === "active"): ?>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -361,17 +362,12 @@ function formatTimeMMSS($seconds): string
 
                             <?php elseif ($status === "completed"): ?>
 
-                                <!-- Check -->
-                                <svg xmlns="http://www.w3.org/2000/svg"
-                                     width="24"
-                                     height="24"
-                                     viewBox="0 0 24 24"
+                                <!-- Undo -->
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20"
                                      fill="none">
-
-                                    <path fill-rule="evenodd"
-                                          clip-rule="evenodd"
-                                          d="M20.7805 5.46888C20.8503 5.53854 20.9057 5.62131 20.9436 5.71243C20.9814 5.80354 21.0008 5.90123 21.0008 5.99988C21.0008 6.09853 20.9814 6.19621 20.9436 6.28733C20.9057 6.37844 20.8503 6.46121 20.7805 6.53088L10.2805 17.0309C10.2108 17.1007 10.1281 17.1561 10.0369 17.1939C9.94582 17.2318 9.84813 17.2512 9.74948 17.2512C9.65083 17.2512 9.55315 17.2318 9.46203 17.1939C9.37091 17.1561 9.28815 17.1007 9.21848 17.0309L3.96848 11.7809C3.82765 11.64 3.74854 11.449 3.74854 11.2499C3.74854 11.0507 3.82765 10.8597 3.96848 10.7189C4.10931 10.578 4.30032 10.4989 4.49948 10.4989C4.69865 10.4989 4.88965 10.578 5.03048 10.7189L9.74948 15.4394L19.7185 5.46888C19.7882 5.39903 19.8709 5.34362 19.962 5.30581C20.0532 5.268 20.1508 5.24854 20.2495 5.24854C20.3481 5.24854 20.4458 5.268 20.5369 5.30581C20.628 5.34362 20.7108 5.39903 20.7805 5.46888Z"
-                                          fill="#525FDD"/>
+                                    <path fill-rule="evenodd" clip-rule="evenodd"
+                                          d="M0.419604 0.419604C0.552277 0.286595 0.709888 0.181067 0.883407 0.109064C1.05693 0.0370616 1.24295 0 1.43081 0C1.61868 0 1.8047 0.0370616 1.97822 0.109064C2.15174 0.181067 2.30935 0.286595 2.44202 0.419604L10.0004 7.98082L17.5587 0.419604C17.6915 0.286811 17.8492 0.181473 18.0227 0.109605C18.1962 0.0377376 18.3821 0.00074779 18.5699 0.00074779C18.7577 0.00074779 18.9437 0.0377376 19.1172 0.109605C19.2907 0.181473 19.4484 0.286811 19.5811 0.419604C19.7139 0.552398 19.8193 0.710047 19.8911 0.88355C19.963 1.05705 20 1.24301 20 1.43081C20 1.61861 19.963 1.80457 19.8911 1.97808C19.8193 2.15158 19.7139 2.30923 19.5811 2.44202L12.0199 10.0004L19.5811 17.5587C19.7139 17.6915 19.8193 17.8492 19.8911 18.0227C19.963 18.1962 20 18.3821 20 18.5699C20 18.7577 19.963 18.9437 19.8911 19.1172C19.8193 19.2907 19.7139 19.4484 19.5811 19.5811C19.4484 19.7139 19.2907 19.8193 19.1172 19.8911C18.9437 19.963 18.7577 20 18.5699 20C18.3821 20 18.1962 19.963 18.0227 19.8911C17.8492 19.8193 17.6915 19.7139 17.5587 19.5811L10.0004 12.0199L2.44202 19.5811C2.30923 19.7139 2.15158 19.8193 1.97808 19.8911C1.80457 19.963 1.61861 20 1.43081 20C1.24301 20 1.05705 19.963 0.88355 19.8911C0.710047 19.8193 0.552398 19.7139 0.419604 19.5811C0.286811 19.4484 0.181473 19.2907 0.109605 19.1172C0.0377376 18.9437 0.00074779 18.7577 0.00074779 18.5699C0.00074779 18.3821 0.0377376 18.1962 0.109605 18.0227C0.181473 17.8492 0.286811 17.6915 0.419604 17.5587L7.98082 10.0004L0.419604 2.44202C0.286595 2.30935 0.181067 2.15174 0.109064 1.97822C0.0370616 1.8047 0 1.61868 0 1.43081C0 1.24295 0.0370616 1.05693 0.109064 0.883407C0.181067 0.709888 0.286595 0.552277 0.419604 0.419604Z"
+                                          fill="#E93C79"/>
                                 </svg>
                             <?php endif; ?>
                         </div>
@@ -446,29 +442,42 @@ function formatTimeMMSS($seconds): string
 </footer>
 
 <script>
-    document.querySelectorAll(".complete-set-btn").forEach(btn => {
+    document.querySelectorAll('.complete-set-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const id = btn.dataset.workoutExerciseId;
 
-        btn.addEventListener("click", async () => {
-
-            const workoutExerciseId = btn.dataset.workoutExerciseId;
-
-            const res = await fetch("completeSet.php", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded"
-                },
-                body: `workout_exercise_id=${workoutExerciseId}`
+            const res = await fetch('completeSet.php', {
+                method: 'POST',
+                headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                body: 'workout_exercise_id=' + id
             });
 
             const data = await res.json();
 
-            if (data.success) {
-                location.reload(); // simplest safe refresh
+            if (data.success) location.reload();
+        });
+    });
+
+    let timers = {};
+
+    function startTimer(id, seconds) {
+        if (timers[id]) clearInterval(timers[id]);
+
+        let t = seconds;
+
+        timers[id] = setInterval(() => {
+            const el = document.querySelector('[data-timer="'+id+'"]').parentElement;
+
+            if (t <= 0) {
+                clearInterval(timers[id]);
+                location.reload();
             }
 
-        });
+            if (el) el.innerHTML = "Rest: " + t + "s";
 
-    });
+            t--;
+        }, 1000);
+    }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
