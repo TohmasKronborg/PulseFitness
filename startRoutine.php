@@ -12,7 +12,7 @@ if (empty($_SESSION['userId'])) {
     exit();
 }
 
-$userId = $_SESSION['userId'];
+$userId = (int)$_SESSION['userId'];
 
 $workoutId = $_GET['workout_id'] ?? null;
 
@@ -20,16 +20,25 @@ if (!$workoutId) {
     exit("Missing workout_id");
 }
 
-//1. Get workout
+// 1. GET WORKOUT
+
 $workout = $db->sql("
-    SELECT w.id, w.workout_number, w.name, w.program_id
+    SELECT 
+        w.id,
+        w.workout_number,
+        w.name,
+        w.program_id
     FROM workouts w
-    INNER JOIN training_programs p ON p.id = w.program_id
-    WHERE w.id = :id
-      AND p.member_id = :user_id
+
+    INNER JOIN training_programs tp
+        ON tp.id = w.program_id
+
+    WHERE w.id = :workout_id
+      AND tp.member_id = :user_id
+
     LIMIT 1
 ", [
-    ":id" => $workoutId,
+    ":workout_id" => $workoutId,
     ":user_id" => $userId
 ]);
 
@@ -38,26 +47,93 @@ if (!$workout) {
 }
 
 $workout = $workout[0];
-$programId = $workout->program_id;
 
+// 2. CREATE MISSING SET PROGRESS
 
-// 2. Get exercises for this workout
-$exercises = $db->sql("
-    SELECT 
-        e.id,
+$db->sql("
+    INSERT IGNORE INTO user_workout_progress (
+        user_id,
+        workout_exercise_id,
+        set_number,
+        status
+    )
+
+    SELECT
+        :user_id,
+        we.id,
+        seq.set_number,
+        CASE
+            WHEN seq.set_number = 1 THEN 'active'
+            ELSE 'pending'
+        END
+
+    FROM workout_exercises we
+
+    JOIN (
+        SELECT 1 AS set_number
+        UNION ALL SELECT 2
+        UNION ALL SELECT 3
+        UNION ALL SELECT 4
+        UNION ALL SELECT 5
+        UNION ALL SELECT 6
+        UNION ALL SELECT 7
+        UNION ALL SELECT 8
+        UNION ALL SELECT 9
+        UNION ALL SELECT 10
+    ) seq
+        ON seq.set_number <= we.sets
+
+    WHERE we.workout_id = :workout_id
+", [
+    ":user_id" => $userId,
+    ":workout_id" => $workoutId
+]);
+
+// 3. GET EXERCISES + SET STATES
+
+$rows = $db->sql("
+    SELECT
+        we.id AS workout_exercise_id,
+
+        e.id AS exercise_id,
         e.name,
         e.description,
+
         we.exercise_order,
         we.sets,
         we.reps,
         we.rest_seconds,
-        e.difficulty_id,
-        e.goal_id,
-        mg.name AS muscle_group_name
+
+        seq.set_number,
+
+        COALESCE(uwp.status, 'pending') AS status,
+        uwp.completed_at,
+
+        GROUP_CONCAT(DISTINCT mg.name SEPARATOR ', ') AS muscle_groups
+
     FROM workout_exercises we
 
-    INNER JOIN exercises e 
+    INNER JOIN exercises e
         ON e.id = we.exercise_id
+
+    JOIN (
+        SELECT 1 AS set_number
+        UNION ALL SELECT 2
+        UNION ALL SELECT 3
+        UNION ALL SELECT 4
+        UNION ALL SELECT 5
+        UNION ALL SELECT 6
+        UNION ALL SELECT 7
+        UNION ALL SELECT 8
+        UNION ALL SELECT 9
+        UNION ALL SELECT 10
+    ) seq
+        ON seq.set_number <= we.sets
+
+    LEFT JOIN user_workout_progress uwp
+        ON uwp.workout_exercise_id = we.id
+        AND uwp.user_id = :user_id
+        AND uwp.set_number = seq.set_number
 
     LEFT JOIN exercise_muscle_groups emg
         ON emg.exercise_id = e.id
@@ -67,24 +143,79 @@ $exercises = $db->sql("
 
     WHERE we.workout_id = :workout_id
 
-    ORDER BY we.exercise_order ASC
+    GROUP BY
+        we.id,
+        seq.set_number
+
+    ORDER BY
+        we.exercise_order ASC,
+        seq.set_number ASC
 ", [
+    ":user_id" => $userId,
     ":workout_id" => $workoutId
 ]);
 
+// 4. GROUP EXERCISES
 
-// 3. Total amount of workouts
-$total_workouts = $db->sql("
-    SELECT COUNT(*) AS total_workouts
-    FROM workouts w
-    INNER JOIN training_programs p ON p.id = w.program_id
-    WHERE p.member_id = :user_id
-", [
-    ":user_id" => $userId
-]);
+$exercises = [];
 
-function formatTimeMMSS($seconds) {
-    return sprintf('%02d:%02d', floor($seconds / 60), $seconds % 60);
+foreach ($rows as $row) {
+
+    $exerciseId = $row->workout_exercise_id;
+
+    if (!isset($exercises[$exerciseId])) {
+
+        $exercises[$exerciseId] = [
+            "workout_exercise_id" => $row->workout_exercise_id,
+            "exercise_id" => $row->exercise_id,
+
+            "name" => $row->name,
+            "description" => $row->description,
+            "muscle_groups" => $row->muscle_groups,
+
+            "exercise_order" => $row->exercise_order,
+
+            "sets" => $row->sets,
+            "reps" => $row->reps,
+            "rest_seconds" => $row->rest_seconds,
+
+            "set_data" => []
+        ];
+    }
+
+    $exercises[$exerciseId]["set_data"][] = [
+        "set_number" => $row->set_number,
+        "status" => $row->status,
+        "completed_at" => $row->completed_at
+    ];
+}
+
+// 5. CALCULATE WORKOUT PROGRESS
+
+$totalSets = 0;
+$completedSets = 0;
+
+foreach ($exercises as $exercise) {
+
+    foreach ($exercise["set_data"] as $set) {
+
+        $totalSets++;
+
+        if ($set["status"] === "completed") {
+            $completedSets++;
+        }
+    }
+}
+
+// 6. HELPER FUNCTIONS
+
+function formatTimeMMSS($seconds): string
+{
+    return sprintf(
+        '%02d:%02d',
+        floor($seconds / 60),
+        $seconds % 60
+    );
 }
 ?>
 
@@ -93,7 +224,7 @@ function formatTimeMMSS($seconds) {
 <head>
     <meta charset="utf-8">
 
-    <title>Tilføj Øvelse</title>
+    <title>Rutine Start</title>
 
     <meta name="robots" content="All">
     <meta name="author" content="Udgiver">
@@ -120,191 +251,152 @@ function formatTimeMMSS($seconds) {
     <h1 class="montserrat fw-bold">
         Dag <?= (int)$workout->workout_number ?> - <?= htmlspecialchars($workout->name, ENT_QUOTES, 'UTF-8') ?>
     </h1>
-    <p class="text-gray"><?= 3 ?> / <?= $total_workouts ?> Øvelser Fuldført</p>
+    <p class="text-gray m-0"><?= $completedSets ?> / <?= $totalSets ?> Sets Fuldført</p>
 </div>
 
 <!-- Tasks Container -->
 <div class="container-fluid mb-5">
-    <!-- Default -->
-    <div class="row bg-white rounded-4 p-3 m-0 justify-content-between mb-4">
-        <div class="col-12 p-0">
-            <h2 class="fs-4 m-0"><b class="montserrat"><?= $exercises[0]->name ?></b> — <?= $exercises[0]->muscle_group_name?></h2>
-            <p class="m-0"><?= $exercises[0]->sets ?> set af <?= $exercises[0]->reps ?></p>
-        </div>
 
-        <hr class="my-2">
+    <?php foreach ($exercises as $exercise): ?>
 
-        <!-- Set indicators -->
-        <div class="col-11 p-0 pe-3">
-            <!-- Active -->
-            <div class="row p-0 m-0">
-                <div class="montserrat p-0 bg-secondary text-white p-2 rounded-3 d-flex mb-3 col-11">
-                    <p class="m-0 me-5">Set 1</p>
-                    <p class="m-0"><b><?= $exercises[0]->reps ?></b> Reps</p>
-                </div>
-                <!-- Arrow -->
-                <div class="col-1 d-flex justify-content-center pt-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <g clip-path="url(#clip0_135_951)">
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M23.999 12.0002C23.999 12.4169 23.841 12.8166 23.5597 13.1112C23.2785 13.4059 22.897 13.5714 22.4992 13.5714H5.12213L11.5624 20.3147C11.7019 20.4608 11.8125 20.6342 11.8879 20.8251C11.9634 21.016 12.0023 21.2205 12.0023 21.4271C12.0023 21.6337 11.9634 21.8383 11.8879 22.0291C11.8125 22.22 11.7019 22.3934 11.5624 22.5395C11.423 22.6856 11.2574 22.8014 11.0752 22.8805C10.893 22.9596 10.6977 23.0002 10.5005 23.0002C10.3033 23.0002 10.108 22.9596 9.92585 22.8805C9.74365 22.8014 9.5781 22.6856 9.43865 22.5395L0.439655 13.1126C0.299981 12.9667 0.189165 12.7933 0.113554 12.6024C0.0379429 12.4115 -0.000976563 12.2069 -0.000976562 12.0002C-0.000976563 11.7936 0.0379429 11.589 0.113554 11.3981C0.189165 11.2072 0.299981 11.0338 0.439655 10.8879L9.43865 1.461C9.72028 1.16598 10.1022 1.00024 10.5005 1.00024C10.8988 1.00024 11.2808 1.16598 11.5624 1.461C11.844 1.75602 12.0023 2.15615 12.0023 2.57337C12.0023 2.99059 11.844 3.39073 11.5624 3.68575L5.12213 10.4291H22.4992C22.897 10.4291 23.2785 10.5946 23.5597 10.8893C23.841 11.1839 23.999 11.5836 23.999 12.0002Z" fill="#525FDD"/>
-                        </g>
-                        <defs>
-                            <clipPath id="clip0_135_951">
-                                <rect width="24" height="24" fill="white"/>
-                            </clipPath>
-                        </defs>
-                    </svg>
-                </div>
-            </div>
+        <?php
 
-            <!-- Inactive -->
-            <div class="col-11">
-                <div class="montserrat p-0 bg-light text-dark p-2 rounded-3 d-flex mb-3">
-                    <p class="m-0 me-5">Set 2</p>
-                    <p class="m-0"><b><?= $exercises[0]->reps ?></b> Reps</p>
-                </div>
-            </div>
+        $hasActiveSet = false;
 
-            <!-- Inactive -->
-            <div class="col-11">
-                <div class="montserrat p-0 bg-light text-dark p-2 rounded-3 d-flex">
-                    <p class="m-0 me-5">Set 3</p>
-                    <p class="m-0"><b><?= $exercises[0]->reps ?></b> Reps</p>
-                </div>
-            </div>
-        </div>
+        foreach ($exercise["set_data"] as $set) {
+            if ($set["status"] === "active") {
+                $hasActiveSet = true;
+                break;
+            }
+        }
 
-        <!-- Check -->
-        <div class="col-1 flex-center bg-primary rounded-3">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path fill-rule="evenodd" clip-rule="evenodd"
-                      d="M20.7805 5.46888C20.8503 5.53854 20.9057 5.62131 20.9436 5.71243C20.9814 5.80354 21.0008 5.90123 21.0008 5.99988C21.0008 6.09853 20.9814 6.19621 20.9436 6.28733C20.9057 6.37844 20.8503 6.46121 20.7805 6.53088L10.2805 17.0309C10.2108 17.1007 10.1281 17.1561 10.0369 17.1939C9.94582 17.2318 9.84813 17.2512 9.74948 17.2512C9.65083 17.2512 9.55315 17.2318 9.46203 17.1939C9.37091 17.1561 9.28815 17.1007 9.21848 17.0309L3.96848 11.7809C3.82765 11.64 3.74854 11.449 3.74854 11.2499C3.74854 11.0507 3.82765 10.8597 3.96848 10.7189C4.10931 10.578 4.30032 10.4989 4.49948 10.4989C4.69865 10.4989 4.88965 10.578 5.03048 10.7189L9.74948 15.4394L19.7185 5.46888C19.7882 5.39903 19.8709 5.34362 19.962 5.30581C20.0532 5.268 20.1508 5.24854 20.2495 5.24854C20.3481 5.24854 20.4458 5.268 20.5369 5.30581C20.628 5.34362 20.7108 5.39903 20.7805 5.46888Z"
-                      fill="white"/>
-            </svg>
-        </div>
+        ?>
 
-    </div>
+        <!-- Exercise Card Row -->
+        <div class="row bg-white rounded-4 p-3 m-0 justify-content-between mb-4">
 
-    <!-- Waiting -->
-    <div class="row bg-white rounded-4 p-3 m-0 justify-content-between mb-4">
-        <div class="col-12 p-0">
-            <h2 class="fs-4 m-0"><b class="montserrat"><?= $exercises[2]->name ?></b> — <?= $exercises[2]->muscle_group_name?></h2>
-            <p class="m-0"><?= $exercises[2]->sets ?> set af <?= $exercises[2]->reps ?></p>
-        </div>
-
-        <hr class="my-2">
-
-        <!-- Set indicators -->
-        <div class="col-11 p-0 pe-3">
-            <!-- Done -->
+            <!-- Exercise Header -->
             <div class="col-12 p-0">
-                <div class="montserrat p-0 bg-light text-gray p-2 rounded-3 d-flex mb-3">
-                    <p class="m-0 me-5"><s>Set 2</s></p>
-                    <p class="m-0"><s><b><?= $exercises[3]->reps ?></b> Reps</s></p>
-                </div>
+                <h2 class="fs-4 m-0"><b class="montserrat"><?= htmlspecialchars($exercise["name"]) ?></b> — <?= htmlspecialchars($exercise["muscle_groups"]) ?></h2>
+                <p class="m-0"><?= $exercise["sets"] ?> set af <?= $exercise["reps"] ?></p>
             </div>
 
-            <!-- Waiting -->
-            <div class="row p-0 m-0">
-                <div class="montserrat p-0 bg-secondary text-white p-2 rounded-3 d-flex mb-3 col-11">
-                    <p class="m-0 me-5">Set 1</p>
-                    <p class="m-0">Hvil - <b><?php echo formatTimeMMSS($exercises[2]->rest_seconds); ?></b></p>
-                </div>
-                <!-- Glock -->
-                <div class="col-1 d-flex justify-content-center pt-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <g clip-path="url(#clip0_135_1019)">
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M12 22.5C14.7848 22.5 17.4555 21.3938 19.4246 19.4246C21.3938 17.4555 22.5 14.7848 22.5 12C22.5 9.21523 21.3938 6.54451 19.4246 4.57538C17.4555 2.60625 14.7848 1.5 12 1.5C9.21523 1.5 6.54451 2.60625 4.57538 4.57538C2.60625 6.54451 1.5 9.21523 1.5 12C1.5 14.7848 2.60625 17.4555 4.57538 19.4246C6.54451 21.3938 9.21523 22.5 12 22.5ZM24 12C24 15.1826 22.7357 18.2348 20.4853 20.4853C18.2348 22.7357 15.1826 24 12 24C8.8174 24 5.76516 22.7357 3.51472 20.4853C1.26428 18.2348 0 15.1826 0 12C0 8.8174 1.26428 5.76516 3.51472 3.51472C5.76516 1.26428 8.8174 0 12 0C15.1826 0 18.2348 1.26428 20.4853 3.51472C22.7357 5.76516 24 8.8174 24 12Z" fill="#525FDD"/>
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M11.25 4.5C11.4489 4.5 11.6397 4.57902 11.7803 4.71967C11.921 4.86032 12 5.05109 12 5.25V13.065L16.872 15.849C17.0397 15.9502 17.1612 16.1129 17.2104 16.3024C17.2597 16.492 17.2329 16.6933 17.1358 16.8633C17.0386 17.0333 16.8788 17.1586 16.6905 17.2124C16.5022 17.2661 16.3003 17.2441 16.128 17.151L10.878 14.151C10.7632 14.0854 10.6678 13.9907 10.6014 13.8764C10.535 13.762 10.5 13.6322 10.5 13.5V5.25C10.5 5.05109 10.579 4.86032 10.7197 4.71967C10.8603 4.57902 11.0511 4.5 11.25 4.5Z" fill="#525FDD"/>
-                        </g>
-                        <defs>
-                            <clipPath id="clip0_135_1019">
-                                <rect width="24" height="24" fill="white"/>
-                            </clipPath>
-                        </defs>
-                    </svg>
-                </div>
+            <hr class="my-2">
+
+            <!-- Sets Indicators -->
+            <div class="col-10 p-0 pe-3">
+                <?php foreach ($exercise["set_data"] as $set): ?>
+
+                    <?php
+
+                    $status = $set["status"];
+
+                    $cardClass = "bg-light text-dark";
+
+                    if ($status === "active") {
+                        $cardClass = "bg-secondary text-white";
+                    }
+
+                    if ($status === "completed") {
+                        $cardClass = "bg-light text-gray";
+                    }
+
+                    if ($status === "resting") {
+                        $cardClass = "bg-secondary text-white";
+                    }
+
+                    ?>
+
+                    <!-- Active -->
+                    <div class="row p-0 m-0 mb-3 justify-content-between">
+                        <div class="montserrat p-2 rounded-3 d-flex col-10 <?= $cardClass ?>">
+                            <p class="m-0 me-5">
+                                <?php if ($status === "completed"): ?>
+                                    <s>Set <?= $set["set_number"] ?></s>
+                                <?php else: ?>
+                                    Set <?= $set["set_number"] ?>
+                                <?php endif; ?>
+                            </p>
+                            <p class="m-0">
+                                <?php if ($status === "resting"): ?>
+                                    Hvil - <b class="rest-timer" data-rest="<?= $exercise["rest_seconds"] ?>"><?= formatTimeMMSS($exercise["rest_seconds"]) ?></b>
+                                <?php else: ?>
+                                    <?php if ($status === "completed"): ?>
+                                        <s><b><?= $exercise["reps"] ?></b> Reps</s>
+                                    <?php else: ?>
+                                        <b><?= $exercise["reps"] ?></b> Reps
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </p>
+                        </div>
+
+                        <!-- Icon -->
+                        <div class="col-1 d-flex justify-content-center pt-2 p-0">
+                            <!-- Arrow -->
+                            <?php if ($status === "active"): ?>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <g clip-path="url(#clip0_135_951)">
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M23.999 12.0002C23.999 12.4169 23.841 12.8166 23.5597 13.1112C23.2785 13.4059 22.897 13.5714 22.4992 13.5714H5.12213L11.5624 20.3147C11.7019 20.4608 11.8125 20.6342 11.8879 20.8251C11.9634 21.016 12.0023 21.2205 12.0023 21.4271C12.0023 21.6337 11.9634 21.8383 11.8879 22.0291C11.8125 22.22 11.7019 22.3934 11.5624 22.5395C11.423 22.6856 11.2574 22.8014 11.0752 22.8805C10.893 22.9596 10.6977 23.0002 10.5005 23.0002C10.3033 23.0002 10.108 22.9596 9.92585 22.8805C9.74365 22.8014 9.5781 22.6856 9.43865 22.5395L0.439655 13.1126C0.299981 12.9667 0.189165 12.7933 0.113554 12.6024C0.0379429 12.4115 -0.000976563 12.2069 -0.000976562 12.0002C-0.000976563 11.7936 0.0379429 11.589 0.113554 11.3981C0.189165 11.2072 0.299981 11.0338 0.439655 10.8879L9.43865 1.461C9.72028 1.16598 10.1022 1.00024 10.5005 1.00024C10.8988 1.00024 11.2808 1.16598 11.5624 1.461C11.844 1.75602 12.0023 2.15615 12.0023 2.57337C12.0023 2.99059 11.844 3.39073 11.5624 3.68575L5.12213 10.4291H22.4992C22.897 10.4291 23.2785 10.5946 23.5597 10.8893C23.841 11.1839 23.999 11.5836 23.999 12.0002Z" fill="#525FDD"/>
+                                    </g>
+                                    <defs>
+                                        <clipPath id="clip0_135_951">
+                                            <rect width="24" height="24" fill="white"/>
+                                        </clipPath>
+                                    </defs>
+                                </svg>
+
+                            <?php elseif ($status === "resting"): ?>
+                                <!-- Clock -->
+                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                                    <g clip-path="url(#clip0_135_1019)">
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M12 22.5C14.7848 22.5 17.4555 21.3938 19.4246 19.4246C21.3938 17.4555 22.5 14.7848 22.5 12C22.5 9.21523 21.3938 6.54451 19.4246 4.57538C17.4555 2.60625 14.7848 1.5 12 1.5C9.21523 1.5 6.54451 2.60625 4.57538 4.57538C2.60625 6.54451 1.5 9.21523 1.5 12C1.5 14.7848 2.60625 17.4555 4.57538 19.4246C6.54451 21.3938 9.21523 22.5 12 22.5ZM24 12C24 15.1826 22.7357 18.2348 20.4853 20.4853C18.2348 22.7357 15.1826 24 12 24C8.8174 24 5.76516 22.7357 3.51472 20.4853C1.26428 18.2348 0 15.1826 0 12C0 8.8174 1.26428 5.76516 3.51472 3.51472C5.76516 1.26428 8.8174 0 12 0C15.1826 0 18.2348 1.26428 20.4853 3.51472C22.7357 5.76516 24 8.8174 24 12Z" fill="#525FDD"/>
+                                        <path fill-rule="evenodd" clip-rule="evenodd" d="M11.25 4.5C11.4489 4.5 11.6397 4.57902 11.7803 4.71967C11.921 4.86032 12 5.05109 12 5.25V13.065L16.872 15.849C17.0397 15.9502 17.1612 16.1129 17.2104 16.3024C17.2597 16.492 17.2329 16.6933 17.1358 16.8633C17.0386 17.0333 16.8788 17.1586 16.6905 17.2124C16.5022 17.2661 16.3003 17.2441 16.128 17.151L10.878 14.151C10.7632 14.0854 10.6678 13.9907 10.6014 13.8764C10.535 13.762 10.5 13.6322 10.5 13.5V5.25C10.5 5.05109 10.579 4.86032 10.7197 4.71967C10.8603 4.57902 11.0511 4.5 11.25 4.5Z" fill="#525FDD"/>
+                                    </g>
+                                    <defs>
+                                        <clipPath id="clip0_135_1019">
+                                            <rect width="24" height="24" fill="white"/>
+                                        </clipPath>
+                                    </defs>
+                                </svg>
+
+                            <?php elseif ($status === "completed"): ?>
+
+                                <!-- Check -->
+                                <svg xmlns="http://www.w3.org/2000/svg"
+                                     width="24"
+                                     height="24"
+                                     viewBox="0 0 24 24"
+                                     fill="none">
+
+                                    <path fill-rule="evenodd"
+                                          clip-rule="evenodd"
+                                          d="M20.7805 5.46888C20.8503 5.53854 20.9057 5.62131 20.9436 5.71243C20.9814 5.80354 21.0008 5.90123 21.0008 5.99988C21.0008 6.09853 20.9814 6.19621 20.9436 6.28733C20.9057 6.37844 20.8503 6.46121 20.7805 6.53088L10.2805 17.0309C10.2108 17.1007 10.1281 17.1561 10.0369 17.1939C9.94582 17.2318 9.84813 17.2512 9.74948 17.2512C9.65083 17.2512 9.55315 17.2318 9.46203 17.1939C9.37091 17.1561 9.28815 17.1007 9.21848 17.0309L3.96848 11.7809C3.82765 11.64 3.74854 11.449 3.74854 11.2499C3.74854 11.0507 3.82765 10.8597 3.96848 10.7189C4.10931 10.578 4.30032 10.4989 4.49948 10.4989C4.69865 10.4989 4.88965 10.578 5.03048 10.7189L9.74948 15.4394L19.7185 5.46888C19.7882 5.39903 19.8709 5.34362 19.962 5.30581C20.0532 5.268 20.1508 5.24854 20.2495 5.24854C20.3481 5.24854 20.4458 5.268 20.5369 5.30581C20.628 5.34362 20.7108 5.39903 20.7805 5.46888Z"
+                                          fill="#525FDD"/>
+                                </svg>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                <?php endforeach; ?>
+
             </div>
 
-            <!-- Inactive -->
-            <div class="col-11">
-                <div class="montserrat p-0 bg-light text-dark p-2 rounded-3 d-flex mb-3">
-                    <p class="m-0 me-5">Set 2</p>
-                    <p class="m-0"><b><?= $exercises[2]->reps ?></b> Reps</p>
-                </div>
-            </div>
+            <!-- Complete Set Button -->
+                <?php if ($hasActiveSet): ?>
+
+                    <button type="button" class="btn btn-primary col-2 flex-center rounded-3 p-0 complete-set-btn" data-workout-exercise-id="<?= $exercise["workout_exercise_id"] ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="35" height="35" viewBox="0 0 35 35" fill="none">
+                            <path fill-rule="evenodd" clip-rule="evenodd"
+                                  d="M30.3051 7.97538C30.4069 8.07698 30.4877 8.19768 30.5429 8.33056C30.598 8.46344 30.6264 8.60589 30.6264 8.74976C30.6264 8.89362 30.598 9.03608 30.5429 9.16896C30.4877 9.30184 30.4069 9.42253 30.3051 9.52413L14.9926 24.8366C14.891 24.9385 14.7703 25.0193 14.6374 25.0744C14.5045 25.1296 14.362 25.158 14.2182 25.158C14.0743 25.158 13.9319 25.1296 13.799 25.0744C13.6661 25.0193 13.5454 24.9385 13.4438 24.8366L5.78755 17.1804C5.58218 16.975 5.4668 16.6965 5.4668 16.406C5.4668 16.1156 5.58218 15.837 5.78755 15.6316C5.99293 15.4263 6.27148 15.3109 6.56193 15.3109C6.85238 15.3109 7.13093 15.4263 7.3363 15.6316L14.2182 22.5157L28.7563 7.97538C28.8579 7.87353 28.9786 7.79271 29.1115 7.73757C29.2444 7.68244 29.3868 7.65405 29.5307 7.65405C29.6745 7.65405 29.817 7.68244 29.9499 7.73757C30.0828 7.79271 30.2035 7.87353 30.3051 7.97538V7.97538Z"
+                                  fill="white"/>
+                        </svg>
+                    </button>
+
+                <?php endif; ?>
+
         </div>
 
-        <!-- Check -->
-        <div class="col-1 flex-center bg-primary rounded-3">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path fill-rule="evenodd" clip-rule="evenodd"
-                      d="M20.7805 5.46888C20.8503 5.53854 20.9057 5.62131 20.9436 5.71243C20.9814 5.80354 21.0008 5.90123 21.0008 5.99988C21.0008 6.09853 20.9814 6.19621 20.9436 6.28733C20.9057 6.37844 20.8503 6.46121 20.7805 6.53088L10.2805 17.0309C10.2108 17.1007 10.1281 17.1561 10.0369 17.1939C9.94582 17.2318 9.84813 17.2512 9.74948 17.2512C9.65083 17.2512 9.55315 17.2318 9.46203 17.1939C9.37091 17.1561 9.28815 17.1007 9.21848 17.0309L3.96848 11.7809C3.82765 11.64 3.74854 11.449 3.74854 11.2499C3.74854 11.0507 3.82765 10.8597 3.96848 10.7189C4.10931 10.578 4.30032 10.4989 4.49948 10.4989C4.69865 10.4989 4.88965 10.578 5.03048 10.7189L9.74948 15.4394L19.7185 5.46888C19.7882 5.39903 19.8709 5.34362 19.962 5.30581C20.0532 5.268 20.1508 5.24854 20.2495 5.24854C20.3481 5.24854 20.4458 5.268 20.5369 5.30581C20.628 5.34362 20.7108 5.39903 20.7805 5.46888Z"
-                      fill="white"/>
-            </svg>
-        </div>
-
-    </div>
-
-    <!-- Nearly done -->
-    <div class="row bg-white rounded-4 p-3 m-0 justify-content-between">
-        <div class="col-12 p-0">
-            <h2 class="fs-4 m-0"><b class="montserrat"><?= $exercises[3]->name ?></b> — <?= $exercises[3]->muscle_group_name?></h2>
-            <p class="m-0"><?= $exercises[3]->sets ?> set af <?= $exercises[3]->reps ?></p>
-        </div>
-
-        <hr class="my-2">
-
-        <!-- Set indicators -->
-        <div class="col-11 p-0 pe-3">
-            <!-- Done -->
-            <div class="col-12 p-0">
-                <div class="montserrat p-0 bg-light text-gray p-2 rounded-3 d-flex mb-3">
-                    <p class="m-0 me-5"><s>Set 2</s></p>
-                    <p class="m-0"><s><b><?= $exercises[3]->reps ?></b> Reps</s></p>
-                </div>
-            </div>
-
-            <!-- Done -->
-            <div class="col-12 p-0">
-                <div class="montserrat p-0 bg-light text-gray p-2 rounded-3 d-flex mb-3">
-                    <p class="m-0 me-5"><s>Set 2</s></p>
-                    <p class="m-0"><s><b><?= $exercises[3]->reps ?></b> Reps</s></p>
-                </div>
-            </div>
-
-            <!-- Active -->
-            <div class="row p-0 m-0">
-                <div class="montserrat p-0 bg-secondary text-white p-2 rounded-3 d-flex mb-3 col-11">
-                    <p class="m-0 me-5">Set 1</p>
-                    <p class="m-0"><b><?= $exercises[3]->reps ?></b> Reps</p>
-                </div>
-                <!-- Arrow -->
-                <div class="col-1 d-flex justify-content-center pt-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <g clip-path="url(#clip0_135_951)">
-                            <path fill-rule="evenodd" clip-rule="evenodd" d="M23.999 12.0002C23.999 12.4169 23.841 12.8166 23.5597 13.1112C23.2785 13.4059 22.897 13.5714 22.4992 13.5714H5.12213L11.5624 20.3147C11.7019 20.4608 11.8125 20.6342 11.8879 20.8251C11.9634 21.016 12.0023 21.2205 12.0023 21.4271C12.0023 21.6337 11.9634 21.8383 11.8879 22.0291C11.8125 22.22 11.7019 22.3934 11.5624 22.5395C11.423 22.6856 11.2574 22.8014 11.0752 22.8805C10.893 22.9596 10.6977 23.0002 10.5005 23.0002C10.3033 23.0002 10.108 22.9596 9.92585 22.8805C9.74365 22.8014 9.5781 22.6856 9.43865 22.5395L0.439655 13.1126C0.299981 12.9667 0.189165 12.7933 0.113554 12.6024C0.0379429 12.4115 -0.000976563 12.2069 -0.000976562 12.0002C-0.000976563 11.7936 0.0379429 11.589 0.113554 11.3981C0.189165 11.2072 0.299981 11.0338 0.439655 10.8879L9.43865 1.461C9.72028 1.16598 10.1022 1.00024 10.5005 1.00024C10.8988 1.00024 11.2808 1.16598 11.5624 1.461C11.844 1.75602 12.0023 2.15615 12.0023 2.57337C12.0023 2.99059 11.844 3.39073 11.5624 3.68575L5.12213 10.4291H22.4992C22.897 10.4291 23.2785 10.5946 23.5597 10.8893C23.841 11.1839 23.999 11.5836 23.999 12.0002Z" fill="#525FDD"/>
-                        </g>
-                        <defs>
-                            <clipPath id="clip0_135_951">
-                                <rect width="24" height="24" fill="white"/>
-                            </clipPath>
-                        </defs>
-                    </svg>
-                </div>
-            </div>
-        </div>
-
-        <!-- Check -->
-        <div class="col-1 flex-center bg-primary rounded-3">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path fill-rule="evenodd" clip-rule="evenodd"
-                      d="M20.7805 5.46888C20.8503 5.53854 20.9057 5.62131 20.9436 5.71243C20.9814 5.80354 21.0008 5.90123 21.0008 5.99988C21.0008 6.09853 20.9814 6.19621 20.9436 6.28733C20.9057 6.37844 20.8503 6.46121 20.7805 6.53088L10.2805 17.0309C10.2108 17.1007 10.1281 17.1561 10.0369 17.1939C9.94582 17.2318 9.84813 17.2512 9.74948 17.2512C9.65083 17.2512 9.55315 17.2318 9.46203 17.1939C9.37091 17.1561 9.28815 17.1007 9.21848 17.0309L3.96848 11.7809C3.82765 11.64 3.74854 11.449 3.74854 11.2499C3.74854 11.0507 3.82765 10.8597 3.96848 10.7189C4.10931 10.578 4.30032 10.4989 4.49948 10.4989C4.69865 10.4989 4.88965 10.578 5.03048 10.7189L9.74948 15.4394L19.7185 5.46888C19.7882 5.39903 19.8709 5.34362 19.962 5.30581C20.0532 5.268 20.1508 5.24854 20.2495 5.24854C20.3481 5.24854 20.4458 5.268 20.5369 5.30581C20.628 5.34362 20.7108 5.39903 20.7805 5.46888Z"
-                      fill="white"/>
-            </svg>
-        </div>
-
-    </div>
+    <?php endforeach; ?>
 
 </div>
 
@@ -353,7 +445,31 @@ function formatTimeMMSS($seconds) {
     </div>
 </footer>
 
-<script src="scripts/canvas.js"></script>
+<script>
+    document.querySelectorAll(".complete-set-btn").forEach(btn => {
+
+        btn.addEventListener("click", async () => {
+
+            const workoutExerciseId = btn.dataset.workoutExerciseId;
+
+            const res = await fetch("completeSet.php", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                body: `workout_exercise_id=${workoutExerciseId}`
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                location.reload(); // simplest safe refresh
+            }
+
+        });
+
+    });
+</script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
