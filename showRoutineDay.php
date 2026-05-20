@@ -200,7 +200,7 @@ $total_workouts = $total_workouts[0]->total_workouts;
                         <tr>
                             <td class="flex-column">
                                 <strong class="fs-5"><?= htmlspecialchars($ex->name) ?></strong>
-                                <?= htmlspecialchars($ex->description) ?>
+                                <?= !empty($ex->description) ? htmlspecialchars($ex->description) : "" ?>
                             </td>
                             <td><?= (int)$ex->sets . " x " . (int)$ex->reps ?></td>
                         </tr>

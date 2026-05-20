@@ -220,24 +220,25 @@ if ($_POST) {
             // BASE VALUES (static baseline)
             $sets = 3;
             $reps = 10;
-            $rest = 90; // NEVER modified
+            $rest = 120; // NEVER modified
 
             // GOAL ADJUSTMENTS (NOW WITH -1 / -2 INCLUDED)
 
             switch ($goalId) {
 
-                case 1: // Styrketræning (heavier load)
-                    $sets += 2;
-                    $reps -= 2;
-                    break;
-
-                case 2: // Muskelopbygning (slight increase volume)
+                case 1: // Styrketræning
                     $sets += 1;
+                    $reps -= rand(2, 4);
+                    $rest = 180;
                     break;
 
-                case 3: // Vægttab (higher reps, slightly less sets)
-                    $sets -= 1;
-                    $reps += 2;
+                case 2: // Muskelopbygning
+                    $sets += 1;
+                    $rest = 180;
+                    break;
+
+                case 3: // Vægttab
+                    // no change
                     break;
 
                 case 4: // Vedligeholdelse
@@ -245,8 +246,8 @@ if ($_POST) {
                     break;
 
                 case 5: // Genoptræning (reduced load)
-                    $sets -= 2;
-                    $reps -= 2;
+                    $sets -= 1;
+                    $rest = 90;
                     break;
             }
 
