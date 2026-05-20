@@ -1,5 +1,7 @@
 <?php
-
+/**
+ * @var db $db
+ */
 require "settings/init.php";
 session_start();
 
